@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 3 complete -- ready for Phase 4 (Authentication & Authorization) |
+| Current Focus | Phase 4 in progress -- JWT & RBAC modules complete, integration next |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -13,16 +13,16 @@
 
 | Field | Value |
 |-------|-------|
-| Phase | 03-http-backend-routing (complete) |
-| Plan | 03-02 (complete) |
-| Status | Phase 3 complete (2/2 plans) -- ready for Phase 4 |
+| Phase | 04-authentication-authorization |
+| Plan | 04-01 (complete) |
+| Status | Phase 4 plan 1 complete (1/? plans) |
 
 **Overall Progress:**
 ```
 Phase  1 [x] Foundation & Config (2/2 plans)
 Phase  2 [x] MCP Protocol Layer (2/2 plans)
 Phase  3 [x] HTTP Backend Routing (2/2 plans)
-Phase  4 [ ] Authentication & Authorization
+Phase  4 [~] Authentication & Authorization (1/? plans)
 Phase  5 [ ] Audit Logging
 Phase  6 [ ] Rate Limiting & Kill Switch
 Phase  7 [ ] Health & Reliability
@@ -36,8 +36,8 @@ Phase 10 [ ] Deployment & Integration
 | Metric | Value |
 |--------|-------|
 | Phases completed | 3/10 |
-| Plans completed | 6/? |
-| Requirements completed | 13/47 |
+| Plans completed | 7/? |
+| Requirements completed | 17/47 |
 | Session count | 5 |
 
 | Phase | Plan | Duration | Tasks | Files |
@@ -46,6 +46,7 @@ Phase 10 [ ] Deployment & Integration
 | 02 | 02 | 4min | 2 | 7 |
 | 03 | 01 | 5min | 2 | 9 |
 | 03 | 02 | 4min | 2 | 6 |
+| 04 | 01 | 4min | 2 | 6 |
 
 ## Accumulated Context
 
@@ -66,6 +67,9 @@ Phase 10 [ ] Deployment & Integration
 - reqwest 0.12 (not 0.13) because 0.13 lacks rustls-tls feature
 - Stub catalog fallback when no HTTP backends reachable (binary always starts)
 - discover_tools() in backend/http.rs (collocated with HttpBackend)
+- jsonwebtoken 10.x requires explicit rust_crypto feature (default-features panics at runtime)
+- AuthError maps all variants to JSON-RPC -32001 for consistent error handling
+- tools.execute implies tools.read (single is_tool_allowed function for both list and call)
 
 ### Known Gotchas
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -81,16 +85,16 @@ Phase 10 [ ] Deployment & Integration
 - None
 
 ### TODOs
-- Plan Phase 4 (Authentication & Authorization)
+- Execute Phase 4 Plan 2 (auth integration into dispatch loop)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 03-02-PLAN.md -- tools/call dispatch routing, backend discovery, ID remapping, 6 new tests (60 total)
-- **Stopped at:** Completed 03-02-PLAN.md (Phase 3 complete)
-- **Next step:** Plan Phase 4 (Authentication & Authorization)
+- **What happened:** Executed 04-01-PLAN.md -- JWT validation (JwtValidator, Claims, AuthError) and RBAC (is_tool_allowed, Permission), 16 new tests (76 total)
+- **Stopped at:** Completed 04-01-PLAN.md
+- **Next step:** Execute Phase 4 Plan 2 (auth integration into dispatch loop)
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22T03:31Z*
+*Last updated: 2026-02-22T04:08Z*

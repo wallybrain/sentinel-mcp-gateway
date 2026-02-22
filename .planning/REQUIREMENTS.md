@@ -9,13 +9,13 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Authentication
 
-- [ ] **AUTH-01**: Gateway validates JWT tokens (HS256) on every incoming request, checking exp/iss/aud/jti claims
-- [ ] **AUTH-02**: Gateway rejects requests with missing, expired, or malformed tokens with JSON-RPC error response
-- [ ] **AUTH-03**: Gateway extracts role claims from JWT for downstream RBAC decisions
+- [x] **AUTH-01**: Gateway validates JWT tokens (HS256) on every incoming request, checking exp/iss/aud/jti claims
+- [x] **AUTH-02**: Gateway rejects requests with missing, expired, or malformed tokens with JSON-RPC error response
+- [x] **AUTH-03**: Gateway extracts role claims from JWT for downstream RBAC decisions
 
 ### Authorization
 
-- [ ] **AUTHZ-01**: Gateway enforces per-tool, per-role permissions defined in TOML config
+- [x] **AUTHZ-01**: Gateway enforces per-tool, per-role permissions defined in TOML config
 - [ ] **AUTHZ-02**: `tools/list` responses are filtered by caller's role — users only see tools they can call
 - [ ] **AUTHZ-03**: `tools/call` requests are rejected if caller's role lacks permission for the requested tool
 
@@ -140,10 +140,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 4 | Pending |
-| AUTH-02 | Phase 4 | Pending |
-| AUTH-03 | Phase 4 | Pending |
-| AUTHZ-01 | Phase 4 | Pending |
+| AUTH-01 | Phase 4 | Complete |
+| AUTH-02 | Phase 4 | Complete |
+| AUTH-03 | Phase 4 | Complete |
+| AUTHZ-01 | Phase 4 | Complete |
 | AUTHZ-02 | Phase 4 | Pending |
 | AUTHZ-03 | Phase 4 | Pending |
 | ROUTE-01 | Phase 3 | Complete |

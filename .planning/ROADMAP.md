@@ -75,7 +75,7 @@ Plans:
   5. The same RBAC check function is used for both `tools/list` filtering and `tools/call` enforcement
 **Plans:** 2 plans
 Plans:
-- [ ] 04-01-PLAN.md -- JWT validator, RBAC module, and auth unit tests
+- [x] 04-01-PLAN.md -- JWT validator, RBAC module, and auth unit tests
 - [ ] 04-02-PLAN.md -- Wire auth into dispatch loop and update integration tests
 
 ### Phase 5: Audit Logging
@@ -154,7 +154,7 @@ Plans:
 | 1. Foundation & Config | 2/2 | Complete | 2026-02-22 |
 | 2. MCP Protocol Layer | 2/2 | Complete | 2026-02-22 |
 | 3. HTTP Backend Routing | 2/2 | Complete | 2026-02-22 |
-| 4. Authentication & Authorization | 0/2 | Not started | - |
+| 4. Authentication & Authorization | 1/2 | In progress | - |
 | 5. Audit Logging | 0/? | Not started | - |
 | 6. Rate Limiting & Kill Switch | 0/? | Not started | - |
 | 7. Health & Reliability | 0/? | Not started | - |
