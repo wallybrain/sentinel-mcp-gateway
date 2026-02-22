@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 ## Current Position
 
 Phase: 10 of 14 (Pre-Cutover Preparation)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-02-22 -- v1.1 roadmap created (5 phases, 23 requirements)
+Plan: 0 of 2 in current phase
+Status: Planned, ready to execute
+Last activity: 2026-02-22 -- Phase 10 planned (2 plans, 2 waves, verified)
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -32,6 +32,7 @@ Progress: [░░░░░░░░░░] 0%
 - [v1.1 Roadmap]: Clean cutover (not parallel) -- 138 tests verify correctness, rollback is trivial
 - [v1.1 Roadmap]: Separate Postgres instances -- Sentinel gets its own, not sharing ContextForge's
 - [v1.1 Roadmap]: Sidecar migration before cutover -- mcp-n8n/mcp-sqlite must move to Sentinel compose first
+- [Phase 10 Research]: Sidecars live in /home/lwb3/mcp-servers/ (NOT ContextForge compose) -- risk is network ownership, not container ownership
 - [v1.1 Roadmap]: Phases 10-11-12 strictly sequential; 13 follows 12; 14 gated on 24h stability
 
 ### Known Gotchas (carried from v1.0)
@@ -52,10 +53,10 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: v1.1 roadmap created -- 5 phases (10-14), 23 requirements mapped
+Stopped at: Phase 10 planned and verified -- 2 plans (10-01 config/files, 10-02 build/verify), checker passed
 Resume file: None
-Next step: Plan Phase 10
+Next step: `/gsd:execute-phase 10`
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22 after v1.1 roadmap creation*
+*Last updated: 2026-02-22 after Phase 10 planning*
