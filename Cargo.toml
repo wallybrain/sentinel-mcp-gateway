@@ -26,8 +26,10 @@ sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "migrate", "c
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 axum = "0.8"
+prometheus = "0.14"
 tokio-util = { version = "0.7", features = ["rt"] }
 nix = { version = "0.29", default-features = false, features = ["signal", "process"] }
+jsonschema = "0.42"
 
 [dev-dependencies]
 tokio-test = "0.4"

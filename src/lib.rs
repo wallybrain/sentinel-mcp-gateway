@@ -7,6 +7,8 @@ pub mod config;
 pub mod gateway;
 pub mod health;
 pub mod logging;
+pub mod metrics;
 pub mod protocol;
 pub mod ratelimit;
 pub mod transport;
+pub mod validation;
