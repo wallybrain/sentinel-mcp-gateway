@@ -56,20 +56,20 @@ Plans:
 - [x] 10-02-PLAN.md -- Build and start Sentinel stack alongside ContextForge, verify health
 
 ### Phase 11: Cutover Execution
-**Goal**: Sentinel is the live MCP gateway on port 9200 with all 7 backends verified and rollback tested
+**Goal**: Sentinel is the live MCP gateway (native binary, stdio transport) with all backends verified and rollback tested
 **Depends on**: Phase 10
 **Requirements**: CUT-01, CUT-02, CUT-03, CUT-04, CUT-05
 **Success Criteria** (what must be TRUE):
   1. ContextForge gateway container is stopped (not removed -- images and volumes preserved for rollback)
-  2. Sentinel responds to MCP tool calls on port 9200 and health/metrics on port 9201
-  3. Claude Code MCP config references the new Sentinel entry with a valid JWT token
-  4. A tool call to each of the 7 backends succeeds end-to-end through Sentinel (n8n, sqlite, context7, firecrawl, exa, playwright, sequential-thinking)
+  2. Sentinel handles MCP traffic via stdio (native binary spawned by Claude Code) and serves health/metrics on port 9201
+  3. Claude Code MCP config references the native Sentinel binary with a valid JWT token
+  4. Tool calls to governed backends (n8n, sqlite) succeed end-to-end through Sentinel
   5. Rollback procedure is documented and has been tested (restart ContextForge, revert MCP config)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 11-01: TBD
-- [ ] 11-02: TBD
+- [ ] 11-01-PLAN.md -- Build binary, update compose + config, expose ports, generate token
+- [ ] 11-02-PLAN.md -- Stop ContextForge, update Claude Code config, verify backends, document rollback
 
 ### Phase 12: Network Hardening
 **Goal**: Sentinel ports are unreachable from the public internet, verified by external scan
