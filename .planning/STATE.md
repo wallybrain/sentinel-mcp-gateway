@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 5 complete -- audit logging fully wired into dispatch loop and main.rs |
+| Current Focus | Phase 6 in progress -- token bucket rate limiter module and error constants complete |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -13,9 +13,9 @@
 
 | Field | Value |
 |-------|-------|
-| Phase | 05-audit-logging |
-| Plan | 05-02 (complete) |
-| Status | Phase 5 complete (2/2 plans) |
+| Phase | 06-rate-limiting-kill-switch |
+| Plan | 06-01 (complete) |
+| Status | Phase 6 in progress (1/2 plans) |
 
 **Overall Progress:**
 ```
@@ -24,7 +24,7 @@ Phase  2 [x] MCP Protocol Layer (2/2 plans)
 Phase  3 [x] HTTP Backend Routing (2/2 plans)
 Phase  4 [x] Authentication & Authorization (2/2 plans)
 Phase  5 [x] Audit Logging (2/2 plans)
-Phase  6 [ ] Rate Limiting & Kill Switch
+Phase  6 [~] Rate Limiting & Kill Switch (1/2)
 Phase  7 [ ] Health & Reliability
 Phase  8 [ ] stdio Backend Management
 Phase  9 [ ] Observability & Hot Reload
@@ -36,7 +36,7 @@ Phase 10 [ ] Deployment & Integration
 | Metric | Value |
 |--------|-------|
 | Phases completed | 5/10 |
-| Plans completed | 10/? |
+| Plans completed | 11/? |
 | Requirements completed | 23/47 |
 | Session count | 7 |
 
@@ -50,10 +50,13 @@ Phase 10 [ ] Deployment & Integration
 | 04 | 02 | 4min | 2 | 3 |
 | 05 | 01 | 7min | 2 | 7 |
 | 05 | 02 | 3min | 2 | 3 |
+| 06 | 01 | 3min | 2 | 3 |
 
 ## Accumulated Context
 
 ### Key Decisions
+- std::sync::Mutex<HashMap> over DashMap for rate limiter (single stdio transport = zero contention)
+- Lazy refill on access (not background timer) for zero idle resource usage
 - Optional audit_tx parameter (None for tests, Some when Postgres available)
 - RBAC denials emit audit entries with status=denied and latency_ms=0
 - request.params.clone() for handle_tools_call, original consumed by audit entry
@@ -97,15 +100,15 @@ Phase 10 [ ] Deployment & Integration
 - None
 
 ### TODOs
-- Begin Phase 6 planning (Rate Limiting & Kill Switch)
+- Execute 06-02-PLAN.md (wire kill switch and rate limiting into dispatch loop)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 05-02-PLAN.md -- wired audit logging into dispatch loop and main.rs startup
-- **Stopped at:** Completed 05-02-PLAN.md (Phase 5, 2/2 plans -- phase complete)
-- **Next step:** Begin Phase 6 planning (Rate Limiting & Kill Switch)
+- **What happened:** Executed 06-01-PLAN.md -- token bucket rate limiter module and JSON-RPC error constants
+- **Stopped at:** Completed 06-01-PLAN.md (Phase 6, 1/2 plans)
+- **Next step:** Execute 06-02-PLAN.md (wire kill switch and rate limiting into dispatch loop)
 
 ---
 *State initialized: 2026-02-22*

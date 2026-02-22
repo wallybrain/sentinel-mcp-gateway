@@ -103,7 +103,7 @@ Plans:
   4. A backend marked as disabled in config causes all its tools to return JSON-RPC errors (kill switch per backend)
 **Plans:** 2 plans
 Plans:
-- [ ] 06-01-PLAN.md -- RateLimiter module with token bucket, error constants, and unit tests
+- [x] 06-01-PLAN.md -- RateLimiter module with token bucket, error constants, and unit tests
 - [ ] 06-02-PLAN.md -- Wire kill switch and rate limiting into dispatch loop with integration tests
 
 ### Phase 7: Health & Reliability
@@ -162,7 +162,7 @@ Plans:
 | 3. HTTP Backend Routing | 2/2 | Complete | 2026-02-22 |
 | 4. Authentication & Authorization | 2/2 | Complete    | 2026-02-22 |
 | 5. Audit Logging | 2/2 | Complete    | 2026-02-22 |
-| 6. Rate Limiting & Kill Switch | 0/2 | Not started | - |
+| 6. Rate Limiting & Kill Switch | 1/2 | In Progress | - |
 | 7. Health & Reliability | 0/? | Not started | - |
 | 8. stdio Backend Management | 0/? | Not started | - |
 | 9. Observability & Hot Reload | 0/? | Not started | - |
