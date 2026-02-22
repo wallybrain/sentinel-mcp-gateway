@@ -54,11 +54,12 @@ type = "stdio"
 command = "node"
 args = ["/home/lwb3/.nvm/versions/node/v20.20.0/lib/node_modules/firecrawl-mcp/dist/index.js"]
 
-[[backends]]
-name = "exa"
-type = "stdio"
-command = "node"
-args = ["/home/lwb3/.nvm/versions/node/v20.20.0/lib/node_modules/exa-mcp-server/.smithery/stdio/index.cjs"]
+# DISABLED — exa needs EXA_API_KEY env var (not configured, would block startup)
+# [[backends]]
+# name = "exa"
+# type = "stdio"
+# command = "node"
+# args = ["/home/lwb3/.nvm/versions/node/v20.20.0/lib/node_modules/exa-mcp-server/.smithery/stdio/index.cjs"]
 
 [[backends]]
 name = "sequential-thinking"

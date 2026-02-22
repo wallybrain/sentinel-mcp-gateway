@@ -32,7 +32,7 @@
 **Milestone Goal:** Replace ContextForge with Sentinel on the VPS, add monitoring and network hardening.
 
 - [x] **Phase 10: Pre-Cutover Preparation** - Fix port drift, migrate sidecars, deploy Sentinel alongside ContextForge
-- [ ] **Phase 11: Cutover Execution** - Stop ContextForge, bind Sentinel to port 9200, verify all 7 backends
+- [x] **Phase 11: Cutover Execution** - Stop ContextForge, register native binary, verify all backends (**completed 2026-02-22**)
 - [ ] **Phase 12: Network Hardening** - Lock down 127.0.0.1 binding, iptables rules, clean stale networks
 - [ ] **Phase 13: Monitoring Stack** - Prometheus + Grafana dashboard + n8n health checks with Discord alerts
 - [ ] **Phase 14: Operations** - Audit log rotation, backup integration, reboot resilience
@@ -68,8 +68,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 11-01-PLAN.md -- Build binary, update compose + config, expose ports, generate token
-- [ ] 11-02-PLAN.md -- Stop ContextForge, update Claude Code config, verify backends, document rollback
+- [x] 11-01-PLAN.md -- Build binary, update compose + config, expose ports, generate token
+- [x] 11-02-PLAN.md -- Stop ContextForge, register MCP server, verify backends, document rollback
 
 ### Phase 12: Network Hardening
 **Goal**: Sentinel ports are unreachable from the public internet, verified by external scan
@@ -131,11 +131,11 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14
 | 8. stdio Backend Management | v1.0 | 3/3 | Complete | 2026-02-22 |
 | 9. Observability & Hot Reload | v1.0 | 3/3 | Complete | 2026-02-22 |
 | 10. Pre-Cutover Preparation | v1.1 | 2/2 | Complete | 2026-02-22 |
-| 11. Cutover Execution | 1/2 | In Progress|  | - |
+| 11. Cutover Execution | v1.1 | 2/2 | Complete | 2026-02-22 |
 | 12. Network Hardening | v1.1 | 0/TBD | Not started | - |
 | 13. Monitoring Stack | v1.1 | 0/TBD | Not started | - |
 | 14. Operations | v1.1 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-22*
-*Last updated: 2026-02-22 after Phase 10 completion*
+*Last updated: 2026-02-22 after Phase 11 completion*
