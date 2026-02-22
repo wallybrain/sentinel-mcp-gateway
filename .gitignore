@@ -1,0 +1,30 @@
+# Environment and secrets
+.env
+*.env
+.env.*
+
+# Rust build artifacts
+target/
+*.swp
+*.swo
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
+
+# Planning artifacts (GSD)
+.planning/
+
+# Claude
+.claude/
