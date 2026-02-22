@@ -23,8 +23,5 @@ docker-compose.override.yml
 # Logs
 *.log
 
-# Planning artifacts (GSD)
-.planning/
-
 # Claude
 .claude/
