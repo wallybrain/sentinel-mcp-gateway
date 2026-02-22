@@ -24,6 +24,8 @@ pub struct GatewayConfig {
     pub log_level: String,
     #[serde(default = "default_true")]
     pub audit_enabled: bool,
+    #[serde(default = "default_health_listen")]
+    pub health_listen: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -63,6 +65,10 @@ pub struct BackendConfig {
     pub max_restarts: u32,
     #[serde(default = "default_health_interval")]
     pub health_interval_secs: u64,
+    #[serde(default = "default_cb_threshold")]
+    pub circuit_breaker_threshold: u32,
+    #[serde(default = "default_cb_recovery")]
+    pub circuit_breaker_recovery_secs: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -117,6 +123,7 @@ impl Default for GatewayConfig {
             listen: default_listen(),
             log_level: default_log_level(),
             audit_enabled: default_true(),
+            health_listen: default_health_listen(),
         }
     }
 }
@@ -153,4 +160,13 @@ fn default_health_interval() -> u64 {
 }
 fn default_rpm() -> u32 {
     1000
+}
+fn default_health_listen() -> String {
+    "127.0.0.1:9201".to_string()
+}
+fn default_cb_threshold() -> u32 {
+    5
+}
+fn default_cb_recovery() -> u64 {
+    30
 }
