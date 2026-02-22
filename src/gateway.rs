@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use rmcp::model::ListToolsResult;
 use serde_json::json;
 use tokio::sync::mpsc;
+use uuid::Uuid;
 
+use crate::audit::db::AuditEntry;
 use crate::auth::jwt::CallerIdentity;
 use crate::auth::rbac::{is_tool_allowed, Permission};
 use crate::backend::HttpBackend;
@@ -32,6 +34,7 @@ pub async fn run_dispatch(
     id_remapper: &IdRemapper,
     caller: Option<CallerIdentity>,
     rbac_config: &RbacConfig,
+    audit_tx: Option<mpsc::Sender<AuditEntry>>,
 ) -> anyhow::Result<()> {
     let caller = caller.unwrap_or_else(|| CallerIdentity {
         subject: "admin".to_string(),
@@ -120,6 +123,8 @@ pub async fn run_dispatch(
 
             "tools/call" => {
                 if !is_notification {
+                    let request_id = Uuid::new_v4();
+                    let start = std::time::Instant::now();
                     let id = request.id.clone().unwrap_or(JsonRpcId::Null);
                     let tool_name = request
                         .params
@@ -139,12 +144,59 @@ pub async fn run_dispatch(
                                 format!("Permission denied for tool: {name}"),
                             );
                             send_response(&tx, &resp).await;
+
+                            if let Some(ref atx) = audit_tx {
+                                let entry = AuditEntry {
+                                    request_id,
+                                    timestamp: chrono::Utc::now(),
+                                    client_subject: caller.subject.clone(),
+                                    client_role: caller.role.clone(),
+                                    tool_name: name.to_string(),
+                                    backend_name: catalog.route(name).unwrap_or("unknown").to_string(),
+                                    request_args: request.params.clone(),
+                                    response_status: "denied".to_string(),
+                                    error_message: Some(format!("Permission denied for tool: {name}")),
+                                    latency_ms: 0,
+                                };
+                                if let Err(e) = atx.try_send(entry) {
+                                    tracing::warn!(error = %e, "Audit channel full, dropping entry");
+                                }
+                            }
+
                             continue;
                         }
                     }
                     let resp =
-                        handle_tools_call(id, request.params, catalog, backends, id_remapper)
+                        handle_tools_call(id, request.params.clone(), catalog, backends, id_remapper)
                             .await;
+                    let latency_ms = start.elapsed().as_millis() as i64;
+
+                    if let Some(ref atx) = audit_tx {
+                        let tool = tool_name.unwrap_or("unknown").to_string();
+                        let backend = catalog.route(&tool).unwrap_or("unknown").to_string();
+                        let (status, error_msg) = if resp.error.is_some() {
+                            let msg = resp.error.as_ref().map(|e| e.message.clone());
+                            ("error".to_string(), msg)
+                        } else {
+                            ("success".to_string(), None)
+                        };
+                        let entry = AuditEntry {
+                            request_id,
+                            timestamp: chrono::Utc::now(),
+                            client_subject: caller.subject.clone(),
+                            client_role: caller.role.clone(),
+                            tool_name: tool,
+                            backend_name: backend,
+                            request_args: request.params,
+                            response_status: status,
+                            error_message: error_msg,
+                            latency_ms,
+                        };
+                        if let Err(e) = atx.try_send(entry) {
+                            tracing::warn!(error = %e, "Audit channel full, dropping entry");
+                        }
+                    }
+
                     send_response(&tx, &resp).await;
                 }
             }
