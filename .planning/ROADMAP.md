@@ -58,7 +58,10 @@ Plans:
   3. SSE (text/event-stream) responses from backends stream through the gateway without buffering
   4. A backend timeout or transient error triggers automatic retry with exponential backoff and jitter
   5. Idle HTTP connections are reused (connection pooling) and stale connections are cleaned up
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 03-01-PLAN.md -- HttpBackend struct, SSE parser, retry logic, and BackendError types
+- [ ] 03-02-PLAN.md -- Wire tools/call routing into dispatch loop and backend discovery into main.rs
 
 ### Phase 4: Authentication & Authorization
 **Goal**: Every request is authenticated via JWT and authorized against per-tool per-role RBAC rules
@@ -147,7 +150,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Foundation & Config | 2/2 | Complete | 2026-02-22 |
 | 2. MCP Protocol Layer | 2/2 | Complete | 2026-02-22 |
-| 3. HTTP Backend Routing | 0/? | Not started | - |
+| 3. HTTP Backend Routing | 0/2 | Planned | - |
 | 4. Authentication & Authorization | 0/? | Not started | - |
 | 5. Audit Logging | 0/? | Not started | - |
 | 6. Rate Limiting & Kill Switch | 0/? | Not started | - |
