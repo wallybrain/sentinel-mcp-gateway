@@ -1,0 +1,102 @@
+# Sentinel Gateway Configuration
+# All secrets are referenced by environment variable name, never stored here.
+
+[gateway]
+# Address and port to listen on
+listen = "127.0.0.1:9200"
+# Log level: trace, debug, info, warn, error
+log_level = "info"
+# Enable audit logging to Postgres
+audit_enabled = true
+
+[auth]
+# Name of the environment variable containing the JWT secret (NOT the secret itself)
+jwt_secret_env = "JWT_SECRET_KEY"
+# JWT issuer claim
+jwt_issuer = "sentinel-gateway"
+# JWT audience claim
+jwt_audience = "sentinel-api"
+
+[postgres]
+# Name of the environment variable containing the Postgres URL (NOT the URL itself)
+url_env = "DATABASE_URL"
+# Maximum number of connections in the pool
+max_connections = 10
+
+# Backends - each [[backends]] block defines an MCP backend server
+# type = "http" for HTTP/SSE backends, "stdio" for stdio-based backends
+
+[[backends]]
+name = "n8n"
+type = "http"
+url = "http://mcp-n8n:3000"
+timeout_secs = 60
+retries = 3
+
+[[backends]]
+name = "sqlite"
+type = "http"
+url = "http://mcp-sqlite:3000"
+timeout_secs = 60
+retries = 3
+
+[[backends]]
+name = "context7"
+type = "stdio"
+command = "node"
+args = ["/usr/local/lib/node_modules/@upstash/context7-mcp/dist/index.js"]
+restart_on_exit = true
+max_restarts = 5
+
+[[backends]]
+name = "firecrawl"
+type = "stdio"
+command = "node"
+args = ["/usr/local/lib/node_modules/firecrawl-mcp/dist/index.js"]
+
+[[backends]]
+name = "exa"
+type = "stdio"
+command = "node"
+args = ["/usr/local/lib/node_modules/exa-mcp-server/build/index.js"]
+
+[[backends]]
+name = "sequential-thinking"
+type = "stdio"
+command = "node"
+args = ["/usr/local/lib/node_modules/@modelcontextprotocol/server-sequential-thinking/dist/index.js"]
+
+[[backends]]
+name = "playwright"
+type = "stdio"
+command = "node"
+args = ["/usr/local/lib/node_modules/@anthropic/mcp-playwright/dist/index.js"]
+
+# RBAC - Role-Based Access Control
+# Each role defines permissions and optionally denied tools
+
+[rbac.roles.admin]
+permissions = ["*"]
+
+[rbac.roles.developer]
+permissions = ["tools.read", "tools.execute"]
+denied_tools = []
+
+[rbac.roles.viewer]
+permissions = ["tools.read"]
+
+# Rate Limits
+# default_rpm applies to all tools unless overridden in per_tool
+
+[rate_limits]
+default_rpm = 1000
+
+[rate_limits.per_tool]
+execute_workflow = 10
+
+# Kill Switch
+# Disable specific tools or entire backends without restarting
+
+[kill_switch]
+disabled_tools = []
+disabled_backends = []
