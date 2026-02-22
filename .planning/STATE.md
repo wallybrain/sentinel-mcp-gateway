@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 5 in progress -- audit module foundation complete, dispatch integration next |
+| Current Focus | Phase 5 complete -- audit logging fully wired into dispatch loop and main.rs |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -14,8 +14,8 @@
 | Field | Value |
 |-------|-------|
 | Phase | 05-audit-logging |
-| Plan | 05-01 (complete) |
-| Status | Phase 5 in progress (1/2 plans) |
+| Plan | 05-02 (complete) |
+| Status | Phase 5 complete (2/2 plans) |
 
 **Overall Progress:**
 ```
@@ -23,7 +23,7 @@ Phase  1 [x] Foundation & Config (2/2 plans)
 Phase  2 [x] MCP Protocol Layer (2/2 plans)
 Phase  3 [x] HTTP Backend Routing (2/2 plans)
 Phase  4 [x] Authentication & Authorization (2/2 plans)
-Phase  5 [~] Audit Logging (1/2 plans)
+Phase  5 [x] Audit Logging (2/2 plans)
 Phase  6 [ ] Rate Limiting & Kill Switch
 Phase  7 [ ] Health & Reliability
 Phase  8 [ ] stdio Backend Management
@@ -35,9 +35,9 @@ Phase 10 [ ] Deployment & Integration
 
 | Metric | Value |
 |--------|-------|
-| Phases completed | 4/10 |
-| Plans completed | 9/? |
-| Requirements completed | 21/47 |
+| Phases completed | 5/10 |
+| Plans completed | 10/? |
+| Requirements completed | 23/47 |
 | Session count | 7 |
 
 | Phase | Plan | Duration | Tasks | Files |
@@ -49,10 +49,14 @@ Phase 10 [ ] Deployment & Integration
 | 04 | 01 | 4min | 2 | 6 |
 | 04 | 02 | 4min | 2 | 3 |
 | 05 | 01 | 7min | 2 | 7 |
+| 05 | 02 | 3min | 2 | 3 |
 
 ## Accumulated Context
 
 ### Key Decisions
+- Optional audit_tx parameter (None for tests, Some when Postgres available)
+- RBAC denials emit audit entries with status=denied and latency_ms=0
+- request.params.clone() for handle_tools_call, original consumed by audit entry
 - Runtime sqlx::query() instead of compile-time macros (no DATABASE_URL at build time)
 - AuditEntry uses Clone derive for writer drain pattern
 - Writer drains remaining entries on channel close (future-proofing for Phase 7)
@@ -93,16 +97,16 @@ Phase 10 [ ] Deployment & Integration
 - None
 
 ### TODOs
-- Execute Phase 5 Plan 02 (wire audit into dispatch loop)
+- Begin Phase 6 planning (Rate Limiting & Kill Switch)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 05-01-PLAN.md -- audit module foundation with PgPool, migrations, AuditEntry struct, and async writer task
-- **Stopped at:** Completed 05-01-PLAN.md (Phase 5, 1/2 plans)
-- **Next step:** Execute 05-02-PLAN.md (wire audit into dispatch loop)
+- **What happened:** Executed 05-02-PLAN.md -- wired audit logging into dispatch loop and main.rs startup
+- **Stopped at:** Completed 05-02-PLAN.md (Phase 5, 2/2 plans -- phase complete)
+- **Next step:** Begin Phase 6 planning (Rate Limiting & Kill Switch)
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22T04:15Z*
+*Last updated: 2026-02-22T04:47Z*

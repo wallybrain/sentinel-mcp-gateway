@@ -45,8 +45,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Audit
 
-- [ ] **AUDIT-01**: Gateway logs every tool call to Postgres with: timestamp, client identity, tool name, backend, request args (redactable), response status, latency
-- [ ] **AUDIT-02**: Gateway assigns a unique request ID to each tool call, included in all log entries
+- [x] **AUDIT-01**: Gateway logs every tool call to Postgres with: timestamp, client identity, tool name, backend, request args (redactable), response status, latency
+- [x] **AUDIT-02**: Gateway assigns a unique request ID to each tool call, included in all log entries
 - [x] **AUDIT-03**: Audit logging is async and does not block request processing
 
 ### Rate Limiting
@@ -161,8 +161,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROTO-04 | Phase 1 | Complete |
 | PROTO-05 | Phase 3 | Complete |
 | PROTO-06 | Phase 2 | Complete |
-| AUDIT-01 | Phase 5 | Pending |
-| AUDIT-02 | Phase 5 | Pending |
+| AUDIT-01 | Phase 5 | Complete |
+| AUDIT-02 | Phase 5 | Complete |
 | AUDIT-03 | Phase 5 | Complete |
 | RATE-01 | Phase 6 | Pending |
 | RATE-02 | Phase 6 | Pending |
