@@ -140,59 +140,59 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | — | Pending |
-| AUTH-02 | — | Pending |
-| AUTH-03 | — | Pending |
-| AUTHZ-01 | — | Pending |
-| AUTHZ-02 | — | Pending |
-| AUTHZ-03 | — | Pending |
-| ROUTE-01 | — | Pending |
-| ROUTE-02 | — | Pending |
-| ROUTE-03 | — | Pending |
-| ROUTE-04 | — | Pending |
-| STDIO-01 | — | Pending |
-| STDIO-02 | — | Pending |
-| STDIO-03 | — | Pending |
-| STDIO-04 | — | Pending |
-| STDIO-05 | — | Pending |
-| PROTO-01 | — | Pending |
-| PROTO-02 | — | Pending |
-| PROTO-03 | — | Pending |
-| PROTO-04 | — | Pending |
-| PROTO-05 | — | Pending |
-| PROTO-06 | — | Pending |
-| AUDIT-01 | — | Pending |
-| AUDIT-02 | — | Pending |
-| AUDIT-03 | — | Pending |
-| RATE-01 | — | Pending |
-| RATE-02 | — | Pending |
-| RATE-03 | — | Pending |
-| KILL-01 | — | Pending |
-| KILL-02 | — | Pending |
-| KILL-03 | — | Pending |
-| HEALTH-01 | — | Pending |
-| HEALTH-02 | — | Pending |
-| HEALTH-03 | — | Pending |
-| HEALTH-04 | — | Pending |
-| HEALTH-05 | — | Pending |
-| CONFIG-01 | — | Pending |
-| CONFIG-02 | — | Pending |
-| CONFIG-03 | — | Pending |
-| CONFIG-04 | — | Pending |
-| OBS-01 | — | Pending |
-| OBS-02 | — | Pending |
-| OBS-03 | — | Pending |
-| OBS-04 | — | Pending |
-| DEPLOY-01 | — | Pending |
-| DEPLOY-02 | — | Pending |
-| DEPLOY-03 | — | Pending |
-| DEPLOY-04 | — | Pending |
+| AUTH-01 | Phase 4 | Pending |
+| AUTH-02 | Phase 4 | Pending |
+| AUTH-03 | Phase 4 | Pending |
+| AUTHZ-01 | Phase 4 | Pending |
+| AUTHZ-02 | Phase 4 | Pending |
+| AUTHZ-03 | Phase 4 | Pending |
+| ROUTE-01 | Phase 3 | Pending |
+| ROUTE-02 | Phase 8 | Pending |
+| ROUTE-03 | Phase 3 | Pending |
+| ROUTE-04 | Phase 3 | Pending |
+| STDIO-01 | Phase 8 | Pending |
+| STDIO-02 | Phase 8 | Pending |
+| STDIO-03 | Phase 8 | Pending |
+| STDIO-04 | Phase 8 | Pending |
+| STDIO-05 | Phase 8 | Pending |
+| PROTO-01 | Phase 1 | Pending |
+| PROTO-02 | Phase 2 | Pending |
+| PROTO-03 | Phase 2 | Pending |
+| PROTO-04 | Phase 1 | Pending |
+| PROTO-05 | Phase 3 | Pending |
+| PROTO-06 | Phase 2 | Pending |
+| AUDIT-01 | Phase 5 | Pending |
+| AUDIT-02 | Phase 5 | Pending |
+| AUDIT-03 | Phase 5 | Pending |
+| RATE-01 | Phase 6 | Pending |
+| RATE-02 | Phase 6 | Pending |
+| RATE-03 | Phase 6 | Pending |
+| KILL-01 | Phase 6 | Pending |
+| KILL-02 | Phase 6 | Pending |
+| KILL-03 | Phase 9 | Pending |
+| HEALTH-01 | Phase 7 | Pending |
+| HEALTH-02 | Phase 7 | Pending |
+| HEALTH-03 | Phase 7 | Pending |
+| HEALTH-04 | Phase 7 | Pending |
+| HEALTH-05 | Phase 7 | Pending |
+| CONFIG-01 | Phase 1 | Pending |
+| CONFIG-02 | Phase 1 | Pending |
+| CONFIG-03 | Phase 9 | Pending |
+| CONFIG-04 | Phase 1 | Pending |
+| OBS-01 | Phase 9 | Pending |
+| OBS-02 | Phase 9 | Pending |
+| OBS-03 | Phase 9 | Pending |
+| OBS-04 | Phase 9 | Pending |
+| DEPLOY-01 | Phase 1 | Pending |
+| DEPLOY-02 | Phase 10 | Pending |
+| DEPLOY-03 | Phase 10 | Pending |
+| DEPLOY-04 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 46 total
-- Mapped to phases: 0
-- Unmapped: 46
+- v1 requirements: 47 total
+- Mapped to phases: 47
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-22*
-*Last updated: 2026-02-22 after initial definition*
+*Last updated: 2026-02-22 after roadmap creation*
