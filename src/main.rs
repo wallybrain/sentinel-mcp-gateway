@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use clap::Parser;
 use tokio::sync::mpsc;
 
+use sentinel_gateway::auth::jwt::{CallerIdentity, JwtValidator};
 use sentinel_gateway::backend::{build_http_client, discover_tools, HttpBackend};
 use sentinel_gateway::config::types::BackendType;
 use sentinel_gateway::protocol::id_remapper::IdRemapper;
@@ -89,6 +90,36 @@ async fn main() -> anyhow::Result<()> {
 
     let id_remapper = IdRemapper::new();
 
+    // JWT authentication: validate token at session start
+    let caller: Option<CallerIdentity> = {
+        let secret = std::env::var(&config.auth.jwt_secret_env).unwrap_or_default();
+        if secret.is_empty() {
+            tracing::warn!(
+                env_var = %config.auth.jwt_secret_env,
+                "JWT secret not set, auth disabled (dev mode)"
+            );
+            None
+        } else {
+            let validator = JwtValidator::new(
+                secret.as_bytes(),
+                &config.auth.jwt_issuer,
+                &config.auth.jwt_audience,
+            );
+            let token = std::env::var("SENTINEL_TOKEN").map_err(|_| {
+                anyhow::anyhow!("SENTINEL_TOKEN env var required when JWT auth is enabled")
+            })?;
+            let identity = validator.validate(&token).map_err(|e| {
+                anyhow::anyhow!("Authentication failed: {e}")
+            })?;
+            tracing::info!(
+                subject = %identity.subject,
+                role = %identity.role,
+                "Session authenticated"
+            );
+            Some(identity)
+        }
+    };
+
     let (inbound_tx, inbound_rx) = mpsc::channel::<String>(64);
     let (outbound_tx, outbound_rx) = mpsc::channel::<String>(64);
 
@@ -101,6 +132,8 @@ async fn main() -> anyhow::Result<()> {
         &catalog,
         &backends_map,
         &id_remapper,
+        caller,
+        &config.rbac,
     )
     .await?;
 

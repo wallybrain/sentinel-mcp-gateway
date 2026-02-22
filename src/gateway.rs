@@ -4,8 +4,11 @@ use rmcp::model::ListToolsResult;
 use serde_json::json;
 use tokio::sync::mpsc;
 
+use crate::auth::jwt::CallerIdentity;
+use crate::auth::rbac::{is_tool_allowed, Permission};
 use crate::backend::HttpBackend;
 use crate::catalog::ToolCatalog;
+use crate::config::types::RbacConfig;
 use crate::protocol::id_remapper::IdRemapper;
 use crate::protocol::jsonrpc::{
     JsonRpcId, JsonRpcRequest, JsonRpcResponse, INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND,
@@ -14,6 +17,7 @@ use crate::protocol::jsonrpc::{
 use crate::protocol::mcp::{handle_initialize, McpState};
 
 const NOT_INITIALIZED_CODE: i32 = -32002;
+const AUTHZ_ERROR: i32 = -32003;
 
 /// Central dispatch loop that processes MCP messages.
 ///
@@ -26,7 +30,15 @@ pub async fn run_dispatch(
     catalog: &ToolCatalog,
     backends: &HashMap<String, HttpBackend>,
     id_remapper: &IdRemapper,
+    caller: Option<CallerIdentity>,
+    rbac_config: &RbacConfig,
 ) -> anyhow::Result<()> {
+    let caller = caller.unwrap_or_else(|| CallerIdentity {
+        subject: "admin".to_string(),
+        role: "admin".to_string(),
+        token_id: None,
+    });
+
     let mut state = McpState::Created;
 
     while let Some(line) = rx.recv().await {
@@ -86,7 +98,18 @@ pub async fn run_dispatch(
             "tools/list" => {
                 if !is_notification {
                     let id = request.id.clone().unwrap_or(JsonRpcId::Null);
-                    let tools = catalog.all_tools();
+                    let tools: Vec<_> = catalog
+                        .all_tools()
+                        .into_iter()
+                        .filter(|tool| {
+                            is_tool_allowed(
+                                &caller.role,
+                                &tool.name,
+                                Permission::Read,
+                                rbac_config,
+                            )
+                        })
+                        .collect();
                     let result = ListToolsResult::with_all_items(tools);
                     let value = serde_json::to_value(&result)
                         .expect("ListToolsResult serialization cannot fail");
@@ -98,6 +121,27 @@ pub async fn run_dispatch(
             "tools/call" => {
                 if !is_notification {
                     let id = request.id.clone().unwrap_or(JsonRpcId::Null);
+                    let tool_name = request
+                        .params
+                        .as_ref()
+                        .and_then(|p| p.get("name"))
+                        .and_then(|n| n.as_str());
+                    if let Some(name) = tool_name {
+                        if !is_tool_allowed(
+                            &caller.role,
+                            name,
+                            Permission::Execute,
+                            rbac_config,
+                        ) {
+                            let resp = JsonRpcResponse::error(
+                                id,
+                                AUTHZ_ERROR,
+                                format!("Permission denied for tool: {name}"),
+                            );
+                            send_response(&tx, &resp).await;
+                            continue;
+                        }
+                    }
                     let resp =
                         handle_tools_call(id, request.params, catalog, backends, id_remapper)
                             .await;
