@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A Rust-based enterprise MCP (Model Context Protocol) gateway that replaces IBM ContextForge. It routes MCP tool calls from AI clients to backend MCP servers through a single governed chokepoint — providing centralized authentication, authorization, audit logging, and rate limiting. Designed to scale from solo developer to enterprise deployment.
+A Rust-based enterprise MCP (Model Context Protocol) gateway that replaces IBM ContextForge. Routes MCP tool calls from AI clients to backend MCP servers through a single governed chokepoint — providing JWT authentication, per-tool RBAC, Postgres audit logging, rate limiting, kill switches, and operational metrics. Manages both HTTP and stdio backends with crash recovery, circuit breaking, and zero-downtime config reload.
 
 ## Core Value
 
@@ -12,81 +12,75 @@ Every MCP tool call passes through one governed point with auth, audit, and rate
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ JWT authentication with HS256 token validation on every request — v1.0
+- ✓ RBAC — per-tool, per-role authorization checked against token claims — v1.0
+- ✓ Request routing — match tool names to HTTP backends (n8n, sqlite) and stdio backends (context7, firecrawl, exa, playwright, sequential-thinking) — v1.0
+- ✓ stdio backend management — spawn, monitor, crash-detect, restart with exponential backoff, process group kill on shutdown — v1.0
+- ✓ Tool discovery — aggregate `tools/list` schemas from all backends into unified catalog — v1.0
+- ✓ Audit logging — structured log of every tool call to Postgres (request ID, timestamp, client, tool, backend, args, status, latency) — v1.0
+- ✓ Rate limiting — per-client per-tool token bucket with retry-after semantics — v1.0
+- ✓ Kill switch — disable individual tools or entire backends, hot-reloadable via SIGHUP — v1.0
+- ✓ Health endpoints — `/health` (liveness), `/ready` (readiness), `/metrics` (Prometheus) — v1.0
+- ✓ Circuit breaker — per-backend, open after N failures, half-open probe, auto-close — v1.0
+- ✓ Schema validation — reject invalid tool arguments at gateway with descriptive JSON-RPC errors — v1.0
+- ✓ Hot config reload — SIGHUP triggers atomic swap of kill switch + rate limit config — v1.0
+- ✓ Docker deployment — multi-stage Dockerfile + Compose with Postgres — v1.0
 
 ### Active
 
-- [ ] JWT authentication with HS256 token validation on every request
-- [ ] RBAC — per-tool, per-role authorization checked against token claims
-- [ ] Request routing — match tool names to HTTP backend servers (n8n, sqlite)
-- [ ] stdio backend management — spawn and manage child processes (context7, firecrawl, exa, playwright, sequential-thinking)
-- [ ] Tool discovery — aggregate `tools/list` schemas from all backends into one catalog
-- [ ] Audit logging — structured log of every tool call to Postgres (who, what, when, arguments, result status)
-- [ ] Rate limiting — per-client, per-tool token bucket
-- [ ] Health check endpoints — `/health`, `/ready` plus periodic backend pings
-- [ ] Kill switch — disable individual tools or entire backends via config
-- [ ] MCP protocol — JSON-RPC 2.0 over stdio (upstream) and Streamable HTTP (upstream + downstream)
-- [ ] SSE streaming — handle text/event-stream responses from backends
-- [ ] Config system — TOML config for backends, roles, rate limits, kill switches
-- [ ] Docker Compose deployment — gateway + Postgres, network config
-- [ ] Connection management — keep-alive, timeouts, retries with backoff
+(None — ready for v1.1 planning)
 
 ### Out of Scope
 
 - OAuth 2.1 (full spec) — JWT is sufficient for v1, OAuth adds complexity without value at single-user scale
 - mTLS between gateway and backends — localhost/Docker network, TLS not needed internally
-- OPA policy engine — simple RBAC config covers v1 needs
-- Multi-tenancy — single user on VPS, no tenant isolation needed yet
-- Plugin system — build core features first, extensibility in v2
-- OpenTelemetry tracing — structured logging to Postgres is sufficient for v1
-- A2A protocol — agent-to-agent is a separate concern
-- Caching layer — tool calls are mostly write/query operations, caching adds complexity
-- Blue/green deployments — single instance, Docker restart is fine
-- Web admin UI — config files + CLI for v1
+- OPA policy engine — simple RBAC config covers needs
+- Multi-tenancy — single user on VPS, no tenant isolation needed
+- Plugin system — extensibility deferred to v2
+- OpenTelemetry tracing — Prometheus metrics + Postgres audit sufficient for v1
+- A2A protocol — agent-to-agent is separate concern
+- Caching layer — tool calls are mostly write/query operations
+- Blue/green deployments — single instance, Docker restart is sufficient
+- Web admin UI — config files + CLI
+- Streaming HTTP transport (client-side) — stdio transport covers current use case
 
 ## Context
 
-### Current Infrastructure
-- Ubuntu 24.04.4 LTS, 4 cores, 16 GB RAM, 193 GB disk (29% used)
-- 14 Docker containers running (all healthy)
-- IBM ContextForge (Python/FastAPI) governs 2 of 7 MCP servers via 5 containers (~430 MB RAM)
-- 5 MCP servers (context7, firecrawl, exa, playwright, sequential-thinking) are ungoverned — direct stdio from Claude Code
+### Current State (v1.0 shipped)
+
+- **Binary:** ~3,776 lines of Rust across 20 modules
+- **Dependencies:** 32 crates (tokio, axum, reqwest, sqlx, prometheus, jsonschema, rmcp, etc.)
+- **Tests:** 138 (33 unit + 105 integration), all passing
+- **Docker:** Multi-stage build, ~50-100 MB runtime image
+- **Backends:** 7 configured (2 HTTP: n8n, sqlite; 5 stdio: context7, firecrawl, exa, playwright, sequential-thinking)
 
 ### Reference Implementation
-- ContextForge at `/home/lwb3/mcp-context-forge/` — working reference for behavior to match
-- Rust stdio wrapper at `mcp-context-forge/tools_rust/wrapper/` — 890 lines, reusable patterns for reqwest, tokio, JSON-RPC, SSE
-- IBM/Anthropic whitepaper at `/home/lwb3/Architecting-secure-enterprise-AI-agents-with-MCP.pdf` — enterprise requirements spec
-
-### MCP Protocol
-- JSON-RPC 2.0 over stdio (newline-delimited) or Streamable HTTP (POST with JSON or SSE response)
-- Protocol version: 2025-03-26
-- Key methods: `initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `ping`
-- Gateway must handle: request ID correlation, SSE streaming, stdio multiplexing, capability merging
-
-### Documentation
-- Full infrastructure docs in `docs/` directory (pushed to GitHub)
-- Whitepaper requirements mapped to v1/v2 in `docs/WHITEPAPER-REQUIREMENTS.md`
+- ContextForge at `/home/lwb3/mcp-context-forge/` — still running, to be replaced when Sentinel is deployed
+- IBM/Anthropic whitepaper at `/home/lwb3/Architecting-secure-enterprise-AI-agents-with-MCP.pdf`
 
 ## Constraints
 
-- **Language**: Rust — learning goal, performance goal, and product differentiator (single binary)
-- **Deployment**: Docker Compose — gateway container + Postgres, must coexist with ContextForge during development
-- **State**: PostgreSQL — audit logs, config persistence, rate limit state
-- **Compatibility**: Must produce identical MCP responses to ContextForge for the 19 existing tools
-- **Server resources**: 4 cores, 16 GB RAM shared with 14 other containers — Rust binary should use <100 MB
-- **License**: Proprietary (All Rights Reserved) — potential commercial or open-source release later
-- **Pace**: No deadline — built incrementally across sessions, ContextForge runs until Sentinel is ready
+- **Language**: Rust — learning goal, performance, single binary
+- **Deployment**: Docker Compose — gateway + Postgres, coexists with ContextForge during transition
+- **State**: PostgreSQL — audit logs, migrations embedded at compile time
+- **Compatibility**: Must produce identical MCP responses to ContextForge for existing tools
+- **Resources**: <100 MB RAM target, shares VPS with 14 other containers
+- **License**: Proprietary (All Rights Reserved)
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Rust over Python | Learning + performance + single-binary deployment | -- Pending |
-| PostgreSQL for state | Match ContextForge, proven at scale, familiar | -- Pending |
-| Docker Compose deployment | Standard pattern, easy to ship, matches current infra | -- Pending |
-| Proprietary license | Build privately, decide distribution model later | -- Pending |
-| Replace ContextForge as v1 goal | Concrete success criteria — swap on VPS, everything works | -- Pending |
-| Govern all 7 servers | stdio management brings ungoverned servers under gateway | -- Pending |
+| Rust over Python | Learning + performance + single-binary deployment | ✓ Good — 3.7k LOC, fast build, tiny binary |
+| PostgreSQL for state | Match ContextForge, proven, familiar | ✓ Good — sqlx + embedded migrations work well |
+| Docker Compose deployment | Standard pattern, matches current infra | ✓ Good |
+| Proprietary license | Build privately, decide distribution later | — Pending |
+| Replace ContextForge as v1 goal | Concrete success criteria | ✓ Good — all 47 requirements met |
+| Govern all 7 servers | stdio management brings ungoverned servers under gateway | ✓ Good — dual transport (HTTP + stdio) working |
+| Session-level JWT auth (process exit on bad token) | stdio transport = one session per process | ✓ Good — simpler than per-request JSON-RPC errors |
+| Explicit Prometheus registry (not global) | Testable metrics in isolation | ✓ Good — 4 metric unit tests pass cleanly |
+| Single SharedHotConfig RwLock | Atomic swap prevents partial config state | ✓ Good — no race conditions between kill switch and rate limiter |
+| SSE full-buffer accumulation | MCP backends return single-event SSE streams | ⚠️ Revisit if streaming backends added |
 
 ---
-*Last updated: 2026-02-22 after initialization*
+*Last updated: 2026-02-22 after v1.0 milestone*
