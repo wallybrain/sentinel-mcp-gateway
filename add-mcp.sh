@@ -6,6 +6,7 @@
 JWT_SECRET_KEY="$(sed -n 's/^JWT_SECRET_KEY=//p' /home/lwb3/sentinel-gateway/.env)"
 POSTGRES_PASSWORD="$(sed -n 's/^POSTGRES_PASSWORD=//p' /home/lwb3/sentinel-gateway/.env)"
 SENTINEL_TOKEN="$(sed -n 's/^SENTINEL_TOKEN=//p' /home/lwb3/sentinel-gateway/.env)"
+FIRECRAWL_API_KEY="$(sed -n 's/^FIRECRAWL_API_KEY=//p' /home/lwb3/sentinel-gateway/.env)"
 
 # Build JSON with python to avoid shell quoting issues
 JSON=$(python3 -c "
@@ -16,10 +17,11 @@ print(json.dumps({
     'env': {
         'JWT_SECRET_KEY': sys.argv[1],
         'SENTINEL_TOKEN': sys.argv[2],
-        'DATABASE_URL': 'postgres://sentinel:' + sys.argv[3] + '@127.0.0.1:5432/sentinel'
+        'DATABASE_URL': 'postgres://sentinel:' + sys.argv[3] + '@127.0.0.1:5432/sentinel',
+        'FIRECRAWL_API_KEY': sys.argv[4],
     }
 }))
-" "$JWT_SECRET_KEY" "$SENTINEL_TOKEN" "$POSTGRES_PASSWORD")
+" "$JWT_SECRET_KEY" "$SENTINEL_TOKEN" "$POSTGRES_PASSWORD" "$FIRECRAWL_API_KEY")
 
 echo "Generated JSON:"
 echo "$JSON" | python3 -m json.tool
