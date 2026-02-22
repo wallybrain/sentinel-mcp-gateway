@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 6 in progress -- token bucket rate limiter module and error constants complete |
+| Current Focus | Phase 6 complete -- kill switch and rate limiting enforced in dispatch loop |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -13,9 +13,9 @@
 
 | Field | Value |
 |-------|-------|
-| Phase | 06-rate-limiting-kill-switch |
-| Plan | 06-01 (complete) |
-| Status | Phase 6 in progress (1/2 plans) |
+| Phase | 07-health-reliability |
+| Plan | Ready to plan |
+| Status | Phase 6 complete (2/2 plans) |
 
 **Overall Progress:**
 ```
@@ -24,7 +24,7 @@ Phase  2 [x] MCP Protocol Layer (2/2 plans)
 Phase  3 [x] HTTP Backend Routing (2/2 plans)
 Phase  4 [x] Authentication & Authorization (2/2 plans)
 Phase  5 [x] Audit Logging (2/2 plans)
-Phase  6 [~] Rate Limiting & Kill Switch (1/2)
+Phase  6 [x] Rate Limiting & Kill Switch (2/2 plans)
 Phase  7 [ ] Health & Reliability
 Phase  8 [ ] stdio Backend Management
 Phase  9 [ ] Observability & Hot Reload
@@ -35,9 +35,9 @@ Phase 10 [ ] Deployment & Integration
 
 | Metric | Value |
 |--------|-------|
-| Phases completed | 5/10 |
-| Plans completed | 11/? |
-| Requirements completed | 23/47 |
+| Phases completed | 6/10 |
+| Plans completed | 12/? |
+| Requirements completed | 27/47 |
 | Session count | 7 |
 
 | Phase | Plan | Duration | Tasks | Files |
@@ -51,6 +51,7 @@ Phase 10 [ ] Deployment & Integration
 | 05 | 01 | 7min | 2 | 7 |
 | 05 | 02 | 3min | 2 | 3 |
 | 06 | 01 | 3min | 2 | 3 |
+| 06 | 02 | 4min | 2 | 3 |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ Phase 10 [ ] Deployment & Integration
 - CallerIdentity passed to run_dispatch (not JwtValidator) for testability and separation of concerns
 - JWT validation in main.rs, RBAC enforcement in gateway.rs
 - AUTHZ_ERROR is -32003 (distinct from -32001 auth and -32002 not-initialized)
+- Enforcement order: kill switch -> rate limit -> RBAC -> backend call
+- Kill switch filters both tools/list and tools/call for consistency
+- All rejection types (killed, rate_limited) emit audit entries with latency_ms=0
 
 ### Known Gotchas
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -100,16 +104,16 @@ Phase 10 [ ] Deployment & Integration
 - None
 
 ### TODOs
-- Execute 06-02-PLAN.md (wire kill switch and rate limiting into dispatch loop)
+- Plan and execute Phase 7 (Health & Reliability)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 06-01-PLAN.md -- token bucket rate limiter module and JSON-RPC error constants
-- **Stopped at:** Completed 06-01-PLAN.md (Phase 6, 1/2 plans)
-- **Next step:** Execute 06-02-PLAN.md (wire kill switch and rate limiting into dispatch loop)
+- **What happened:** Executed 06-02-PLAN.md -- wired kill switch and rate limiting into dispatch loop with 6 new integration tests
+- **Stopped at:** Completed 06-02-PLAN.md (Phase 6 complete, 2/2 plans)
+- **Next step:** Plan Phase 7 (Health & Reliability)
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22T04:47Z*
+*Last updated: 2026-02-22T05:20Z*

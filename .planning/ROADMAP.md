@@ -12,7 +12,7 @@
 - [x] **Phase 3: HTTP Backend Routing** - Route tool calls to HTTP backends with connection pooling, retries, and SSE passthrough
 - [x] **Phase 4: Authentication & Authorization** - JWT validation and per-tool per-role RBAC on every request
 - [x] **Phase 5: Audit Logging** - Structured audit trail to Postgres with async writes and auto-migrations
-- [ ] **Phase 6: Rate Limiting & Kill Switch** - Per-client per-tool token bucket and per-tool/backend disable switches
+- [x] **Phase 6: Rate Limiting & Kill Switch** - Per-client per-tool token bucket and per-tool/backend disable switches
 - [ ] **Phase 7: Health & Reliability** - Health endpoints, backend pinging, circuit breaker, and graceful shutdown
 - [ ] **Phase 8: stdio Backend Management** - Spawn, supervise, and multiplex JSON-RPC over stdio child processes
 - [ ] **Phase 9: Observability & Hot Reload** - Prometheus metrics, schema validation, and zero-downtime config reload
@@ -104,7 +104,7 @@ Plans:
 **Plans:** 2 plans
 Plans:
 - [x] 06-01-PLAN.md -- RateLimiter module with token bucket, error constants, and unit tests
-- [ ] 06-02-PLAN.md -- Wire kill switch and rate limiting into dispatch loop with integration tests
+- [x] 06-02-PLAN.md -- Wire kill switch and rate limiting into dispatch loop with integration tests
 
 ### Phase 7: Health & Reliability
 **Goal**: The gateway reports its own health, monitors backend health, and shuts down cleanly without dropping requests
@@ -162,7 +162,7 @@ Plans:
 | 3. HTTP Backend Routing | 2/2 | Complete | 2026-02-22 |
 | 4. Authentication & Authorization | 2/2 | Complete    | 2026-02-22 |
 | 5. Audit Logging | 2/2 | Complete    | 2026-02-22 |
-| 6. Rate Limiting & Kill Switch | 1/2 | In Progress | - |
+| 6. Rate Limiting & Kill Switch | 2/2 | Complete | 2026-02-22 |
 | 7. Health & Reliability | 0/? | Not started | - |
 | 8. stdio Backend Management | 0/? | Not started | - |
 | 9. Observability & Hot Reload | 0/? | Not started | - |

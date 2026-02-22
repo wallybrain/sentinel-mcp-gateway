@@ -51,14 +51,14 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Rate Limiting
 
-- [ ] **RATE-01**: Gateway enforces per-client, per-tool rate limits using in-memory token bucket
-- [ ] **RATE-02**: Rate limit configuration is defined per-tool in TOML config with sensible defaults
-- [ ] **RATE-03**: Rate-limited requests receive JSON-RPC error with retry-after semantics
+- [x] **RATE-01**: Gateway enforces per-client, per-tool rate limits using in-memory token bucket
+- [x] **RATE-02**: Rate limit configuration is defined per-tool in TOML config with sensible defaults
+- [x] **RATE-03**: Rate-limited requests receive JSON-RPC error with retry-after semantics
 
 ### Kill Switch
 
-- [ ] **KILL-01**: Gateway can disable individual tools via config (requests return JSON-RPC error)
-- [ ] **KILL-02**: Gateway can disable entire backends via config (all tools on that backend return error)
+- [x] **KILL-01**: Gateway can disable individual tools via config (requests return JSON-RPC error)
+- [x] **KILL-02**: Gateway can disable entire backends via config (all tools on that backend return error)
 - [ ] **KILL-03**: Kill switch changes take effect via hot config reload without restart
 
 ### Health & Reliability
