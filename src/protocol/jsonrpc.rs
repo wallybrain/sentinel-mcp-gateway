@@ -7,6 +7,8 @@ pub const INVALID_REQUEST: i32 = -32600;
 pub const METHOD_NOT_FOUND: i32 = -32601;
 pub const INVALID_PARAMS: i32 = -32602;
 pub const INTERNAL_ERROR: i32 = -32603;
+pub const RATE_LIMIT_ERROR: i32 = -32004;
+pub const KILL_SWITCH_ERROR: i32 = -32005;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -59,6 +61,19 @@ impl JsonRpcResponse {
                 code,
                 message,
                 data: None,
+            }),
+        }
+    }
+
+    pub fn error_with_data(id: JsonRpcId, code: i32, message: String, data: Value) -> Self {
+        Self {
+            jsonrpc: "2.0".to_string(),
+            id,
+            result: None,
+            error: Some(JsonRpcError {
+                code,
+                message,
+                data: Some(data),
             }),
         }
     }
