@@ -86,8 +86,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Deployment
 
 - [x] **DEPLOY-01**: Gateway builds as a single Rust binary via `cargo build --release`
-- [ ] **DEPLOY-02**: Gateway ships as a Docker image with multi-stage build (build + runtime)
-- [ ] **DEPLOY-03**: Docker Compose file defines gateway + Postgres with health checks and restart policies
+- [x] **DEPLOY-02**: Gateway ships as a Docker image with multi-stage build (build + runtime)
+- [x] **DEPLOY-03**: Docker Compose file defines gateway + Postgres with health checks and restart policies
 - [x] **DEPLOY-04**: Database schema migrations run automatically on gateway startup
 
 ## v2 Requirements
@@ -144,17 +144,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-02 | Phase 4 | Complete |
 | AUTH-03 | Phase 4 | Complete |
 | AUTHZ-01 | Phase 4 | Complete |
-| AUTHZ-02 | Phase 4 | Pending |
-| AUTHZ-03 | Phase 4 | Pending |
+| AUTHZ-02 | Phase 4 | Complete |
+| AUTHZ-03 | Phase 4 | Complete |
 | ROUTE-01 | Phase 3 | Complete |
 | ROUTE-02 | Phase 8 | Complete |
 | ROUTE-03 | Phase 3 | Complete |
 | ROUTE-04 | Phase 3 | Complete |
-| STDIO-01 | Phase 8 | Pending |
+| STDIO-01 | Phase 8 | Complete |
 | STDIO-02 | Phase 8 | Complete |
 | STDIO-03 | Phase 8 | Complete |
-| STDIO-04 | Phase 8 | Pending |
-| STDIO-05 | Phase 8 | Pending |
+| STDIO-04 | Phase 8 | Complete |
+| STDIO-05 | Phase 8 | Complete |
 | PROTO-01 | Phase 1 | Complete |
 | PROTO-02 | Phase 2 | Complete |
 | PROTO-03 | Phase 2 | Complete |
@@ -164,11 +164,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUDIT-01 | Phase 5 | Complete |
 | AUDIT-02 | Phase 5 | Complete |
 | AUDIT-03 | Phase 5 | Complete |
-| RATE-01 | Phase 6 | Pending |
-| RATE-02 | Phase 6 | Pending |
-| RATE-03 | Phase 6 | Pending |
-| KILL-01 | Phase 6 | Pending |
-| KILL-02 | Phase 6 | Pending |
+| RATE-01 | Phase 6 | Complete |
+| RATE-02 | Phase 6 | Complete |
+| RATE-03 | Phase 6 | Complete |
+| KILL-01 | Phase 6 | Complete |
+| KILL-02 | Phase 6 | Complete |
 | KILL-03 | Phase 9 | Complete |
 | HEALTH-01 | Phase 7 | Complete |
 | HEALTH-02 | Phase 7 | Complete |
@@ -184,8 +184,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | OBS-03 | Phase 9 | Complete |
 | OBS-04 | Phase 9 | Complete |
 | DEPLOY-01 | Phase 1 | Complete |
-| DEPLOY-02 | Phase 10 | Pending |
-| DEPLOY-03 | Phase 10 | Pending |
+| DEPLOY-02 | Gap closure | Complete |
+| DEPLOY-03 | Gap closure | Complete |
 | DEPLOY-04 | Phase 5 | Complete |
 
 **Coverage:**
@@ -195,4 +195,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-22*
-*Last updated: 2026-02-22 after roadmap creation*
+*Last updated: 2026-02-22 after v1.0 milestone audit gap closure*
