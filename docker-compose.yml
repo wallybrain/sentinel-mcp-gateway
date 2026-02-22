@@ -6,6 +6,7 @@ services:
     stdin_open: true
     environment:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - SENTINEL_TOKEN=${SENTINEL_TOKEN}
       - DATABASE_URL=postgres://sentinel:${POSTGRES_PASSWORD}@postgres:5432/sentinel
       - RUST_LOG=info
     depends_on:

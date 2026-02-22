@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM rust:1.83-slim-bookworm AS builder
+FROM rust:slim-bookworm AS builder
 
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 
@@ -20,7 +20,8 @@ RUN apt-get update && apt-get install -y ca-certificates libssl3 curl && rm -rf 
 RUN groupadd -r sentinel && useradd -r -g sentinel -s /sbin/nologin sentinel
 
 COPY --from=builder /build/target/release/sentinel-gateway /usr/local/bin/sentinel-gateway
-COPY sentinel.toml /etc/sentinel/sentinel.toml
+RUN mkdir -p /etc/sentinel && chmod 755 /etc/sentinel
+COPY --chmod=644 sentinel-docker.toml /etc/sentinel/sentinel.toml
 
 USER sentinel
 

@@ -1,0 +1,59 @@
+# Sentinel Gateway Configuration — Docker deployment
+# HTTP backends only (stdio backends require Node.js, not available in container)
+
+[gateway]
+listen = "0.0.0.0:9200"
+health_listen = "0.0.0.0:9201"
+log_level = "info"
+audit_enabled = true
+
+[auth]
+jwt_secret_env = "JWT_SECRET_KEY"
+jwt_issuer = "sentinel-gateway"
+jwt_audience = "sentinel-api"
+
+[postgres]
+url_env = "DATABASE_URL"
+max_connections = 10
+
+# HTTP backends — sidecar containers on sentinelnet
+
+[[backends]]
+name = "n8n"
+type = "http"
+url = "http://mcp-n8n:3000"
+timeout_secs = 60
+retries = 3
+
+[[backends]]
+name = "sqlite"
+type = "http"
+url = "http://mcp-sqlite:3000"
+timeout_secs = 60
+retries = 3
+
+# RBAC
+
+[rbac.roles.admin]
+permissions = ["*"]
+
+[rbac.roles.developer]
+permissions = ["tools.read", "tools.execute"]
+denied_tools = []
+
+[rbac.roles.viewer]
+permissions = ["tools.read"]
+
+# Rate Limits
+
+[rate_limits]
+default_rpm = 1000
+
+[rate_limits.per_tool]
+execute_workflow = 10
+
+# Kill Switch
+
+[kill_switch]
+disabled_tools = []
+disabled_backends = []
