@@ -24,6 +24,7 @@ COPY sentinel.toml /etc/sentinel/sentinel.toml
 
 USER sentinel
 
+EXPOSE 9200
 EXPOSE 9201
 
 HEALTHCHECK --interval=10s --timeout=3s --retries=3 \

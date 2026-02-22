@@ -12,6 +12,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
+      - "127.0.0.1:9202:9200"
       - "127.0.0.1:9201:9201"
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:9201/health"]
@@ -19,6 +20,8 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
+    networks:
+      - sentinelnet
 
   postgres:
     image: postgres:16-alpine
@@ -36,6 +39,75 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
+    networks:
+      - sentinelnet
+
+  mcp-n8n:
+    build:
+      context: /home/lwb3/n8n-mcp-server
+      dockerfile: /home/lwb3/sentinel-gateway/sidecars/Dockerfile.n8n
+    container_name: mcp-n8n
+    restart: unless-stopped
+    environment:
+      - MCP_TRANSPORT=http
+      - MCP_PORT=3000
+      - N8N_URL=http://n8n:5678
+      - N8N_API_KEY=${N8N_API_KEY}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sentinelnet
+      - n8nnet
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  mcp-sqlite:
+    build:
+      context: /home/lwb3/sqlite-mcp-server
+      dockerfile: /home/lwb3/sentinel-gateway/sidecars/Dockerfile.mcp-sqlite
+    container_name: mcp-sqlite
+    restart: unless-stopped
+    environment:
+      - MCP_TRANSPORT=http
+      - MCP_PORT=3000
+      - SQLITE_DB_DIR=/data
+    volumes:
+      - /home/lwb3/databases:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sentinelnet
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  sentinelnet:
+    driver: bridge
+  n8nnet:
+    external: true
+    name: n8n-mcp_default
 
 volumes:
   pgdata:
