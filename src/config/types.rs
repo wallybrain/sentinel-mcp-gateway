@@ -109,7 +109,7 @@ impl Default for RateLimitConfig {
     }
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct KillSwitchConfig {
     #[serde(default)]
     pub disabled_tools: Vec<String>,

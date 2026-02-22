@@ -1,3 +1,4 @@
+pub mod hot;
 pub mod secrets;
 pub mod types;
 
