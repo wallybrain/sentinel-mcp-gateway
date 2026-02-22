@@ -5,24 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Every MCP tool call passes through one governed point with auth, audit, and rate limiting
-**Current focus:** Phase 15 (Cutover Gap Closure) — closing audit gaps before monitoring
+**Current focus:** Phase 15 complete -- next: Phase 13 (Monitoring Stack)
 
 ## Current Position
 
 Phase: 15 of 15 (Cutover Gap Closure)
-Plan: 1 of 2 (Config Hardening and Gap Closure)
-Status: Phase 15 Plan 01 complete — Plan 02 (rollback test) remains
-Last activity: 2026-02-22 -- Phase 15 Plan 01 executed (session 9)
+Plan: 2 of 2 (Rollback Test and CUT-05)
+Status: Phase 15 COMPLETE -- all cutover gap closure done
+Last activity: 2026-02-22 -- Phase 15 Plan 02 executed (session 10)
 
-Progress: [#########░] 85%
+Progress: [##########] 90%
 
 ## Performance Metrics
 
 **v1.0 (completed):** 9 phases, 20 plans, 47 requirements, 138 tests, 3,776 LOC
 
 **v1.1 Velocity:**
-- Total plans completed: 6 (10-01, 10-02, 11-01, 11-02, 12-01, 15-01)
-- Phases completed: 3 (Phase 10, Phase 11, Phase 12)
+- Total plans completed: 7 (10-01, 10-02, 11-01, 11-02, 12-01, 15-01, 15-02)
+- Phases completed: 4 (Phase 10, Phase 11, Phase 12, Phase 15)
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -32,6 +32,7 @@ Progress: [#########░] 85%
 | 11    | 02   | ~30min   | 4     | 3     |
 | 12    | 01   | 2min     | 2     | 1     |
 | 15    | 01   | 2min     | 3     | 4     |
+| 15    | 02   | 2min     | 3     | 1     |
 
 ## Accumulated Context
 
@@ -50,6 +51,7 @@ Progress: [#########░] 85%
 - [Phase 12]: Sentinel DROP rules placed after existing 8080/before 9999 in iptables chain order
 - [Phase 15-01]: FIRECRAWL_API_KEY wired via sed extraction (same pattern as other vars) rather than relying on env inheritance
 - [Phase 15-01]: health_listen set to 127.0.0.1:9201 matching existing iptables rules
+- [Phase 15]: Rollback requires docker compose rm -f + up -d (not start) due to pruned networks
 
 ### Known Gotchas (carried from v1.0)
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -74,23 +76,22 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-22 (session 9)
-Stopped at: Completed 15-01-PLAN.md
+Last session: 2026-02-22 (session 10)
+Stopped at: Completed 15-02-PLAN.md -- Phase 15 fully done
 Resume file: None
 
 ### What was accomplished:
-- **Phase 15 Plan 01 COMPLETE**: Config hardening and gap closure
-- Durable FIRECRAWL_API_KEY wiring in add-mcp.sh
-- Explicit health_listen in sentinel.toml
-- Removed orphaned sentinel-docker.toml and duplicate MCP registration
-- Updated REQUIREMENTS.md: CUT-01 and CUT-04 marked complete
+- **Phase 15 Plan 02 COMPLETE**: Rollback test executed end-to-end
+- ContextForge containers started and verified responding
+- Sentinel confirmed healthy after rollback reversal
+- CUT-05 marked complete in REQUIREMENTS.md
+- All five cutover requirements (CUT-01 through CUT-05) now satisfied
 
 ### Next steps:
-1. Phase 15 Plan 02: Rollback test (CUT-05)
-2. Phase 13: Monitoring Stack -- Prometheus, Grafana, Discord alerts
-3. Phase 14: Operations -- log rotation, backups, reboot resilience
-4. Optional: Remove ContextForge containers when confident in stability
+1. Phase 13: Monitoring Stack -- Prometheus, Grafana, Discord alerts
+2. Phase 14: Operations -- log rotation, backups, reboot resilience
+3. Optional: Remove ContextForge containers when confident in stability
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22 session 9 -- Phase 15 Plan 01 complete*
+*Last updated: 2026-02-22 session 10 -- Phase 15 complete*

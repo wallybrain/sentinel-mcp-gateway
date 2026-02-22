@@ -36,7 +36,7 @@
 - [x] **Phase 12: Network Hardening** - Lock down 127.0.0.1 binding, iptables rules, clean stale networks (completed 2026-02-22)
 - [ ] **Phase 13: Monitoring Stack** - Prometheus + Grafana dashboard + n8n health checks with Discord alerts
 - [ ] **Phase 14: Operations** - Audit log rotation, backup integration, reboot resilience
-- [ ] **Phase 15: Cutover Gap Closure** - Fix audit gaps: rollback test, Firecrawl key wiring, config hardening, doc sync
+- [x] **Phase 15: Cutover Gap Closure** - Fix audit gaps: rollback test, Firecrawl key wiring, config hardening, doc sync (**completed 2026-02-22**)
 
 ## Phase Details
 
@@ -130,8 +130,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 15-01-PLAN.md -- Config hardening, env wiring, dead file cleanup, doc sync
-- [ ] 15-02-PLAN.md -- Rollback test execution and CUT-05 verification
+- [x] 15-01-PLAN.md -- Config hardening, env wiring, dead file cleanup, doc sync
+- [x] 15-02-PLAN.md -- Rollback test execution and CUT-05 verification
 
 ## Progress
 
@@ -154,7 +154,7 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 15 -> 13 -> 14
 | 12. Network Hardening | v1.1 | 1/1 | Complete | 2026-02-22 |
 | 13. Monitoring Stack | v1.1 | 0/TBD | Not started | - |
 | 14. Operations | v1.1 | 0/TBD | Not started | - |
-| 15. Cutover Gap Closure | 1/2 | In Progress|  | - |
+| 15. Cutover Gap Closure | v1.1 | 2/2 | Complete | 2026-02-22 |
 
 ---
 *Roadmap created: 2026-02-22*
