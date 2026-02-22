@@ -10,13 +10,14 @@ use crate::auth::jwt::CallerIdentity;
 use crate::auth::rbac::{is_tool_allowed, Permission};
 use crate::backend::HttpBackend;
 use crate::catalog::ToolCatalog;
-use crate::config::types::RbacConfig;
+use crate::config::types::{KillSwitchConfig, RbacConfig};
 use crate::protocol::id_remapper::IdRemapper;
 use crate::protocol::jsonrpc::{
-    JsonRpcId, JsonRpcRequest, JsonRpcResponse, INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND,
-    PARSE_ERROR,
+    JsonRpcId, JsonRpcRequest, JsonRpcResponse, INTERNAL_ERROR, INVALID_PARAMS, KILL_SWITCH_ERROR,
+    METHOD_NOT_FOUND, PARSE_ERROR, RATE_LIMIT_ERROR,
 };
 use crate::protocol::mcp::{handle_initialize, McpState};
+use crate::ratelimit::RateLimiter;
 
 const NOT_INITIALIZED_CODE: i32 = -32002;
 const AUTHZ_ERROR: i32 = -32003;
@@ -35,6 +36,8 @@ pub async fn run_dispatch(
     caller: Option<CallerIdentity>,
     rbac_config: &RbacConfig,
     audit_tx: Option<mpsc::Sender<AuditEntry>>,
+    rate_limiter: &RateLimiter,
+    kill_switch: &KillSwitchConfig,
 ) -> anyhow::Result<()> {
     let caller = caller.unwrap_or_else(|| CallerIdentity {
         subject: "admin".to_string(),
@@ -105,6 +108,17 @@ pub async fn run_dispatch(
                         .all_tools()
                         .into_iter()
                         .filter(|tool| {
+                            // Kill switch: hide disabled tools
+                            if kill_switch.disabled_tools.contains(&tool.name.to_string()) {
+                                return false;
+                            }
+                            // Kill switch: hide tools from disabled backends
+                            if let Some(backend) = catalog.route(&tool.name) {
+                                if kill_switch.disabled_backends.contains(&backend.to_string()) {
+                                    return false;
+                                }
+                            }
+                            // RBAC filter
                             is_tool_allowed(
                                 &caller.role,
                                 &tool.name,
@@ -132,6 +146,100 @@ pub async fn run_dispatch(
                         .and_then(|p| p.get("name"))
                         .and_then(|n| n.as_str());
                     if let Some(name) = tool_name {
+                        // Kill switch: tool disabled
+                        if kill_switch.disabled_tools.contains(&name.to_string()) {
+                            let resp = JsonRpcResponse::error(
+                                id.clone(),
+                                KILL_SWITCH_ERROR,
+                                format!("Tool is disabled: {name}"),
+                            );
+                            send_response(&tx, &resp).await;
+
+                            if let Some(ref atx) = audit_tx {
+                                let entry = AuditEntry {
+                                    request_id,
+                                    timestamp: chrono::Utc::now(),
+                                    client_subject: caller.subject.clone(),
+                                    client_role: caller.role.clone(),
+                                    tool_name: name.to_string(),
+                                    backend_name: catalog.route(name).unwrap_or("unknown").to_string(),
+                                    request_args: request.params.clone(),
+                                    response_status: "killed".to_string(),
+                                    error_message: Some(format!("Tool is disabled: {name}")),
+                                    latency_ms: 0,
+                                };
+                                if let Err(e) = atx.try_send(entry) {
+                                    tracing::warn!(error = %e, "Audit channel full, dropping entry");
+                                }
+                            }
+
+                            continue;
+                        }
+
+                        // Kill switch: backend disabled
+                        if let Some(backend_name) = catalog.route(name) {
+                            if kill_switch.disabled_backends.contains(&backend_name.to_string()) {
+                                let resp = JsonRpcResponse::error(
+                                    id.clone(),
+                                    KILL_SWITCH_ERROR,
+                                    format!("Backend is disabled: {backend_name}"),
+                                );
+                                send_response(&tx, &resp).await;
+
+                                if let Some(ref atx) = audit_tx {
+                                    let entry = AuditEntry {
+                                        request_id,
+                                        timestamp: chrono::Utc::now(),
+                                        client_subject: caller.subject.clone(),
+                                        client_role: caller.role.clone(),
+                                        tool_name: name.to_string(),
+                                        backend_name: backend_name.to_string(),
+                                        request_args: request.params.clone(),
+                                        response_status: "killed".to_string(),
+                                        error_message: Some(format!("Backend is disabled: {backend_name}")),
+                                        latency_ms: 0,
+                                    };
+                                    if let Err(e) = atx.try_send(entry) {
+                                        tracing::warn!(error = %e, "Audit channel full, dropping entry");
+                                    }
+                                }
+
+                                continue;
+                            }
+                        }
+
+                        // Rate limit check
+                        if let Err(retry_after) = rate_limiter.check(&caller.subject, name) {
+                            let resp = JsonRpcResponse::error_with_data(
+                                id.clone(),
+                                RATE_LIMIT_ERROR,
+                                format!("Rate limit exceeded for tool: {name}"),
+                                json!({"retryAfter": retry_after.ceil() as u64}),
+                            );
+                            send_response(&tx, &resp).await;
+
+                            if let Some(ref atx) = audit_tx {
+                                let entry = AuditEntry {
+                                    request_id,
+                                    timestamp: chrono::Utc::now(),
+                                    client_subject: caller.subject.clone(),
+                                    client_role: caller.role.clone(),
+                                    tool_name: name.to_string(),
+                                    backend_name: catalog.route(name).unwrap_or("unknown").to_string(),
+                                    request_args: request.params.clone(),
+                                    response_status: "rate_limited".to_string(),
+                                    error_message: Some(format!("Rate limit exceeded for tool: {name}")),
+                                    latency_ms: 0,
+                                };
+                                if let Err(e) = atx.try_send(entry) {
+                                    tracing::warn!(error = %e, "Audit channel full, dropping entry");
+                                }
+                            }
+
+                            continue;
+                        }
+
+                        // RBAC check
                         if !is_tool_allowed(
                             &caller.role,
                             name,

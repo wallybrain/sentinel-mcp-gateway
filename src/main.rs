@@ -8,6 +8,7 @@ use sentinel_gateway::auth::jwt::{CallerIdentity, JwtValidator};
 use sentinel_gateway::backend::{build_http_client, discover_tools, HttpBackend};
 use sentinel_gateway::config::types::BackendType;
 use sentinel_gateway::protocol::id_remapper::IdRemapper;
+use sentinel_gateway::ratelimit::RateLimiter;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -145,6 +146,8 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    let rate_limiter = RateLimiter::new(&config.rate_limits);
+
     let (inbound_tx, inbound_rx) = mpsc::channel::<String>(64);
     let (outbound_tx, outbound_rx) = mpsc::channel::<String>(64);
 
@@ -160,6 +163,8 @@ async fn main() -> anyhow::Result<()> {
         caller,
         &config.rbac,
         audit_tx,
+        &rate_limiter,
+        &config.kill_switch,
     )
     .await?;
 
