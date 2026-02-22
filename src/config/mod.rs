@@ -17,6 +17,21 @@ pub fn load_config(path: &str) -> Result<SentinelConfig, anyhow::Error> {
     Ok(config)
 }
 
+/// Loads config without requiring auth/postgres secrets to be present.
+///
+/// Validates backend definitions but skips JWT and database URL resolution.
+/// Used during early phases when auth and persistence aren't wired yet.
+pub fn load_config_lenient(path: &str) -> Result<SentinelConfig, anyhow::Error> {
+    let content = std::fs::read_to_string(path)
+        .with_context(|| format!("Failed to read config file: {path}"))?;
+
+    let config: SentinelConfig = toml::from_str(&content)
+        .with_context(|| format!("Failed to parse config file: {path}"))?;
+
+    config.validate_backends()?;
+    Ok(config)
+}
+
 impl SentinelConfig {
     pub fn validate(&self) -> Result<(), anyhow::Error> {
         self.auth
@@ -27,6 +42,12 @@ impl SentinelConfig {
             .resolve_url()
             .with_context(|| "Config validation failed")?;
 
+        self.validate_backends()?;
+        Ok(())
+    }
+
+    /// Validates only backend definitions (no auth/postgres secrets needed).
+    pub fn validate_backends(&self) -> Result<(), anyhow::Error> {
         let mut names = HashSet::new();
         for backend in &self.backends {
             if !names.insert(&backend.name) {
