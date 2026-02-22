@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 7 complete -- health, circuit breakers, graceful shutdown wired in |
+| Current Focus | Phase 8 in progress -- StdioBackend core implemented (08-01 complete) |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -14,8 +14,8 @@
 | Field | Value |
 |-------|-------|
 | Phase | 08-stdio-backend |
-| Plan | 01 |
-| Status | Phase 7 complete (2/2 plans), Phase 8 next |
+| Plan | 02 |
+| Status | Phase 8 in progress (1/3 plans complete) |
 
 **Overall Progress:**
 ```
@@ -26,7 +26,7 @@ Phase  4 [x] Authentication & Authorization (2/2 plans)
 Phase  5 [x] Audit Logging (2/2 plans)
 Phase  6 [x] Rate Limiting & Kill Switch (2/2 plans)
 Phase  7 [x] Health & Reliability (2/2 plans)
-Phase  8 [ ] stdio Backend Management
+Phase  8 [~] stdio Backend Management (1/3 plans)
 Phase  9 [ ] Observability & Hot Reload
 Phase 10 [ ] Deployment & Integration
 ```
@@ -36,8 +36,8 @@ Phase 10 [ ] Deployment & Integration
 | Metric | Value |
 |--------|-------|
 | Phases completed | 7/10 |
-| Plans completed | 14/? |
-| Requirements completed | 36/47 |
+| Plans completed | 15/? |
+| Requirements completed | 39/47 |
 | Session count | 7 |
 
 | Phase | Plan | Duration | Tasks | Files |
@@ -54,6 +54,7 @@ Phase 10 [ ] Deployment & Integration
 | 06 | 02 | 4min | 2 | 3 |
 | 07 | 01 | 6min | 2 | 10 |
 | 07 | 02 | 17min | 2 | 6 |
+| 08 | 01 | 3min | 2 | 4 |
 
 ## Accumulated Context
 
@@ -97,6 +98,10 @@ Phase 10 [ ] Deployment & Integration
 - Clone audit_tx for dispatch, keep original for ordered shutdown drop
 - Extract build_health_router() from run_health_server for test reuse
 - HttpBackend derives Clone (reqwest::Client is Clone)
+- std::sync::Mutex for StdioBackend pending map (matches rate limiter pattern, zero contention)
+- process_group(0) + kill_on_drop(false) for explicit stdio process lifecycle management
+- Individual env() calls to preserve parent environment inheritance
+- Bounded mpsc(64) channel for stdin writes (backpressure on stalled child)
 
 ### Known Gotchas
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -112,16 +117,16 @@ Phase 10 [ ] Deployment & Integration
 - None
 
 ### TODOs
-- Plan and execute Phase 8 (stdio backend management)
+- Execute Phase 8 plans 02 and 03 (supervisor + gateway integration)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 07-02-PLAN.md -- wired health server, circuit breakers, and graceful shutdown into main.rs and gateway.rs, 5 new integration tests, 120 total tests passing
-- **Stopped at:** Completed 07-02-PLAN.md (Phase 7 complete, 2/2 plans)
-- **Next step:** Plan and execute Phase 8 (stdio backend management)
+- **What happened:** Executed 08-01-PLAN.md -- StdioBackend core with spawn/send/kill, nix dependency, 3 unit tests passing
+- **Stopped at:** Completed 08-01-PLAN.md (Phase 8: 1/3 plans)
+- **Next step:** Execute 08-02-PLAN.md (supervisor with crash detection and restart)
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22T06:06Z*
+*Last updated: 2026-02-22T06:36Z*
