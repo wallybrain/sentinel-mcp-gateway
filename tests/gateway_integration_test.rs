@@ -1,17 +1,20 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use serde_json::{json, Value};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 use tokio::time::{timeout, Duration};
 
 use sentinel_gateway::auth::jwt::CallerIdentity;
 use sentinel_gateway::backend::Backend;
 use sentinel_gateway::catalog::create_stub_catalog;
+use sentinel_gateway::config::hot::HotConfig;
 use sentinel_gateway::config::types::{KillSwitchConfig, RateLimitConfig, RbacConfig, RoleConfig};
 use sentinel_gateway::gateway::run_dispatch;
 use sentinel_gateway::health::circuit_breaker::CircuitBreaker;
 use sentinel_gateway::protocol::id_remapper::IdRemapper;
 use sentinel_gateway::ratelimit::RateLimiter;
+use sentinel_gateway::validation::SchemaCache;
 use tokio_util::sync::CancellationToken;
 
 fn default_admin_rbac() -> RbacConfig {
@@ -67,6 +70,10 @@ fn make_caller(role: &str) -> CallerIdentity {
     }
 }
 
+fn default_hot_config() -> Arc<RwLock<HotConfig>> {
+    HotConfig::new(KillSwitchConfig::default(), RateLimiter::new(&RateLimitConfig::default())).shared()
+}
+
 /// Spawn dispatch with default admin (no auth) -- existing tests use this.
 async fn spawn_dispatch() -> (mpsc::Sender<String>, mpsc::Receiver<String>) {
     let rbac = default_admin_rbac();
@@ -79,17 +86,15 @@ async fn spawn_dispatch_with_caller(
     caller: Option<CallerIdentity>,
     rbac: &'static RbacConfig,
 ) -> (mpsc::Sender<String>, mpsc::Receiver<String>) {
-    let rate_limiter: &'static _ = Box::leak(Box::new(RateLimiter::new(&RateLimitConfig::default())));
-    let kill_switch: &'static _ = Box::leak(Box::new(KillSwitchConfig::default()));
-    spawn_dispatch_with_config(caller, rbac, rate_limiter, kill_switch).await
+    let hot_config = default_hot_config();
+    spawn_dispatch_with_hot_config(caller, rbac, hot_config).await
 }
 
-/// Spawn dispatch with full config control (caller, RBAC, rate limiter, kill switch).
-async fn spawn_dispatch_with_config(
+/// Spawn dispatch with a specific caller, RBAC, and hot config.
+async fn spawn_dispatch_with_hot_config(
     caller: Option<CallerIdentity>,
     rbac: &'static RbacConfig,
-    rate_limiter: &'static RateLimiter,
-    kill_switch: &'static KillSwitchConfig,
+    hot_config: Arc<RwLock<HotConfig>>,
 ) -> (mpsc::Sender<String>, mpsc::Receiver<String>) {
     let catalog = create_stub_catalog();
     let catalog: &'static _ = Box::leak(Box::new(catalog));
@@ -103,6 +108,9 @@ async fn spawn_dispatch_with_config(
     let circuit_breakers: HashMap<String, CircuitBreaker> = HashMap::new();
     let circuit_breakers: &'static _ = Box::leak(Box::new(circuit_breakers));
 
+    let schema_cache = SchemaCache::from_catalog(catalog);
+    let schema_cache: &'static _ = Box::leak(Box::new(schema_cache));
+
     let cancel = CancellationToken::new();
 
     let (in_tx, in_rx) = mpsc::channel::<String>(64);
@@ -111,7 +119,7 @@ async fn spawn_dispatch_with_config(
     tokio::spawn(async move {
         let _ = run_dispatch(
             in_rx, out_tx, catalog, backends, id_remapper, caller, rbac, None,
-            rate_limiter, kill_switch, circuit_breakers, cancel,
+            hot_config, None, schema_cache, circuit_breakers, cancel,
         )
         .await;
     });
@@ -201,6 +209,7 @@ async fn test_full_mcp_session() {
     .to_string();
     let resp = send_and_recv(&tx, &mut rx, &ping_req).await;
     assert!(resp.get("result").is_some());
+    assert_eq!(resp["result"], json!({}));
 }
 
 #[tokio::test]
@@ -355,12 +364,9 @@ async fn test_tools_call_routes_to_correct_backend() {
 
 #[tokio::test]
 async fn test_tools_call_backend_not_in_map_returns_internal_error() {
-    // A tool is in the catalog but the backend is NOT in the backends map.
-    // This tests the "backend in catalog but not in HashMap" error path.
     let catalog = create_stub_catalog();
     let catalog: &'static _ = Box::leak(Box::new(catalog));
 
-    // Empty backends map (no stub-n8n or stub-sqlite)
     let backends: HashMap<String, Backend> = HashMap::new();
     let backends: &'static _ = Box::leak(Box::new(backends));
 
@@ -370,10 +376,9 @@ async fn test_tools_call_backend_not_in_map_returns_internal_error() {
     let rbac = default_admin_rbac();
     let rbac: &'static _ = Box::leak(Box::new(rbac));
 
-    let rate_limiter = RateLimiter::new(&RateLimitConfig::default());
-    let rate_limiter: &'static _ = Box::leak(Box::new(rate_limiter));
-    let kill_switch = KillSwitchConfig::default();
-    let kill_switch: &'static _ = Box::leak(Box::new(kill_switch));
+    let hot_config = default_hot_config();
+    let schema_cache = SchemaCache::from_catalog(catalog);
+    let schema_cache: &'static _ = Box::leak(Box::new(schema_cache));
 
     let circuit_breakers: HashMap<String, CircuitBreaker> = HashMap::new();
     let circuit_breakers: &'static _ = Box::leak(Box::new(circuit_breakers));
@@ -386,7 +391,7 @@ async fn test_tools_call_backend_not_in_map_returns_internal_error() {
     tokio::spawn(async move {
         let _ = run_dispatch(
             in_rx, out_tx, catalog, backends, id_remapper, None, rbac, None,
-            rate_limiter, kill_switch, circuit_breakers, cancel,
+            hot_config, None, schema_cache, circuit_breakers, cancel,
         )
         .await;
     });
@@ -419,7 +424,6 @@ async fn test_tools_call_backend_not_in_map_returns_internal_error() {
 
 #[tokio::test]
 async fn test_id_remapper_round_trip() {
-    // Verify IdRemapper correctly remaps and restores IDs
     use sentinel_gateway::protocol::jsonrpc::JsonRpcId;
 
     let remapper = IdRemapper::new();
@@ -434,7 +438,6 @@ async fn test_id_remapper_round_trip() {
     assert_eq!(id, original_id);
     assert_eq!(backend, "backend-a");
 
-    // Second restore should return None (already consumed)
     assert!(remapper.restore(gateway_id).is_none());
 }
 
@@ -573,14 +576,12 @@ async fn test_admin_denied_tool_override() {
     let (tx, mut rx) = spawn_dispatch_with_caller(Some(caller), rbac).await;
     do_handshake(&tx, &mut rx).await;
 
-    // Check tools/list excludes denied tool
     let req = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).to_string();
     let resp = send_and_recv(&tx, &mut rx, &req).await;
     let tools = resp["result"]["tools"].as_array().expect("tools array");
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
     assert!(!names.contains(&"execute_workflow"), "denied tool hidden even for admin");
 
-    // Check tools/call blocked
     let req = json!({
         "jsonrpc": "2.0", "id": 2, "method": "tools/call",
         "params": {"name": "execute_workflow", "arguments": {}}
@@ -595,11 +596,9 @@ async fn test_admin_denied_tool_override() {
 
 #[tokio::test]
 async fn test_dispatch_accepts_none_audit_tx() {
-    // Smoke test: dispatch works correctly with audit_tx: None
     let (tx, mut rx) = spawn_dispatch().await;
     do_handshake(&tx, &mut rx).await;
 
-    // tools/call should work (hits backend error, not audit error)
     let req = json!({
         "jsonrpc": "2.0",
         "id": 99,
@@ -608,7 +607,6 @@ async fn test_dispatch_accepts_none_audit_tx() {
     })
     .to_string();
     let resp = send_and_recv(&tx, &mut rx, &req).await;
-    // Should get INTERNAL_ERROR (no real backend), NOT a panic or audit-related error
     let error = resp.get("error").expect("should have error");
     assert_eq!(
         error["code"], -32603,
@@ -621,13 +619,15 @@ async fn test_dispatch_accepts_none_audit_tx() {
 #[tokio::test]
 async fn test_kill_switch_tool_disabled_returns_error() {
     let rbac: &'static _ = Box::leak(Box::new(default_admin_rbac()));
-    let rate_limiter: &'static _ = Box::leak(Box::new(RateLimiter::new(&RateLimitConfig::default())));
-    let kill_switch: &'static _ = Box::leak(Box::new(KillSwitchConfig {
-        disabled_tools: vec!["read_query".to_string()],
-        disabled_backends: vec![],
-    }));
+    let hot_config = HotConfig::new(
+        KillSwitchConfig {
+            disabled_tools: vec!["read_query".to_string()],
+            disabled_backends: vec![],
+        },
+        RateLimiter::new(&RateLimitConfig::default()),
+    ).shared();
 
-    let (tx, mut rx) = spawn_dispatch_with_config(None, rbac, rate_limiter, kill_switch).await;
+    let (tx, mut rx) = spawn_dispatch_with_hot_config(None, rbac, hot_config).await;
     do_handshake(&tx, &mut rx).await;
 
     let req = json!({
@@ -647,13 +647,15 @@ async fn test_kill_switch_tool_disabled_returns_error() {
 #[tokio::test]
 async fn test_kill_switch_tool_hidden_from_list() {
     let rbac: &'static _ = Box::leak(Box::new(default_admin_rbac()));
-    let rate_limiter: &'static _ = Box::leak(Box::new(RateLimiter::new(&RateLimitConfig::default())));
-    let kill_switch: &'static _ = Box::leak(Box::new(KillSwitchConfig {
-        disabled_tools: vec!["read_query".to_string()],
-        disabled_backends: vec![],
-    }));
+    let hot_config = HotConfig::new(
+        KillSwitchConfig {
+            disabled_tools: vec!["read_query".to_string()],
+            disabled_backends: vec![],
+        },
+        RateLimiter::new(&RateLimitConfig::default()),
+    ).shared();
 
-    let (tx, mut rx) = spawn_dispatch_with_config(None, rbac, rate_limiter, kill_switch).await;
+    let (tx, mut rx) = spawn_dispatch_with_hot_config(None, rbac, hot_config).await;
     do_handshake(&tx, &mut rx).await;
 
     let req = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).to_string();
@@ -668,13 +670,15 @@ async fn test_kill_switch_tool_hidden_from_list() {
 #[tokio::test]
 async fn test_kill_switch_backend_disabled_returns_error() {
     let rbac: &'static _ = Box::leak(Box::new(default_admin_rbac()));
-    let rate_limiter: &'static _ = Box::leak(Box::new(RateLimiter::new(&RateLimitConfig::default())));
-    let kill_switch: &'static _ = Box::leak(Box::new(KillSwitchConfig {
-        disabled_tools: vec![],
-        disabled_backends: vec!["stub-sqlite".to_string()],
-    }));
+    let hot_config = HotConfig::new(
+        KillSwitchConfig {
+            disabled_tools: vec![],
+            disabled_backends: vec!["stub-sqlite".to_string()],
+        },
+        RateLimiter::new(&RateLimitConfig::default()),
+    ).shared();
 
-    let (tx, mut rx) = spawn_dispatch_with_config(None, rbac, rate_limiter, kill_switch).await;
+    let (tx, mut rx) = spawn_dispatch_with_hot_config(None, rbac, hot_config).await;
     do_handshake(&tx, &mut rx).await;
 
     let req = json!({
@@ -694,13 +698,15 @@ async fn test_kill_switch_backend_disabled_returns_error() {
 #[tokio::test]
 async fn test_kill_switch_backend_disabled_hides_tools_from_list() {
     let rbac: &'static _ = Box::leak(Box::new(default_admin_rbac()));
-    let rate_limiter: &'static _ = Box::leak(Box::new(RateLimiter::new(&RateLimitConfig::default())));
-    let kill_switch: &'static _ = Box::leak(Box::new(KillSwitchConfig {
-        disabled_tools: vec![],
-        disabled_backends: vec!["stub-sqlite".to_string()],
-    }));
+    let hot_config = HotConfig::new(
+        KillSwitchConfig {
+            disabled_tools: vec![],
+            disabled_backends: vec!["stub-sqlite".to_string()],
+        },
+        RateLimiter::new(&RateLimitConfig::default()),
+    ).shared();
 
-    let (tx, mut rx) = spawn_dispatch_with_config(None, rbac, rate_limiter, kill_switch).await;
+    let (tx, mut rx) = spawn_dispatch_with_hot_config(None, rbac, hot_config).await;
     do_handshake(&tx, &mut rx).await;
 
     let req = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).to_string();
@@ -719,13 +725,15 @@ async fn test_kill_switch_backend_disabled_hides_tools_from_list() {
 #[tokio::test]
 async fn test_rate_limit_exceeded_returns_error() {
     let rbac: &'static _ = Box::leak(Box::new(default_admin_rbac()));
-    let rate_limiter: &'static _ = Box::leak(Box::new(RateLimiter::new(&RateLimitConfig {
-        default_rpm: 2,
-        per_tool: HashMap::new(),
-    })));
-    let kill_switch: &'static _ = Box::leak(Box::new(KillSwitchConfig::default()));
+    let hot_config = HotConfig::new(
+        KillSwitchConfig::default(),
+        RateLimiter::new(&RateLimitConfig {
+            default_rpm: 2,
+            per_tool: HashMap::new(),
+        }),
+    ).shared();
 
-    let (tx, mut rx) = spawn_dispatch_with_config(None, rbac, rate_limiter, kill_switch).await;
+    let (tx, mut rx) = spawn_dispatch_with_hot_config(None, rbac, hot_config).await;
     do_handshake(&tx, &mut rx).await;
 
     // First two calls should NOT return rate limit error (they hit backend error instead)
@@ -764,13 +772,15 @@ async fn test_rate_limit_per_tool_override() {
     per_tool.insert("read_query".to_string(), 1u32);
 
     let rbac: &'static _ = Box::leak(Box::new(default_admin_rbac()));
-    let rate_limiter: &'static _ = Box::leak(Box::new(RateLimiter::new(&RateLimitConfig {
-        default_rpm: 100,
-        per_tool,
-    })));
-    let kill_switch: &'static _ = Box::leak(Box::new(KillSwitchConfig::default()));
+    let hot_config = HotConfig::new(
+        KillSwitchConfig::default(),
+        RateLimiter::new(&RateLimitConfig {
+            default_rpm: 100,
+            per_tool,
+        }),
+    ).shared();
 
-    let (tx, mut rx) = spawn_dispatch_with_config(None, rbac, rate_limiter, kill_switch).await;
+    let (tx, mut rx) = spawn_dispatch_with_hot_config(None, rbac, hot_config).await;
     do_handshake(&tx, &mut rx).await;
 
     // First call to read_query passes (hits backend error)

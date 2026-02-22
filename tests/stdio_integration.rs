@@ -10,6 +10,7 @@ use tokio_util::sync::CancellationToken;
 use sentinel_gateway::backend::stdio::{discover_stdio_tools, kill_process_group};
 use sentinel_gateway::backend::{Backend, StdioBackend};
 use sentinel_gateway::catalog::ToolCatalog;
+use sentinel_gateway::config::hot::HotConfig;
 use sentinel_gateway::config::types::{
     BackendConfig, BackendType, KillSwitchConfig, RateLimitConfig, RbacConfig, RoleConfig,
 };
@@ -17,6 +18,7 @@ use sentinel_gateway::gateway::run_dispatch;
 use sentinel_gateway::health::circuit_breaker::CircuitBreaker;
 use sentinel_gateway::protocol::id_remapper::IdRemapper;
 use sentinel_gateway::ratelimit::RateLimiter;
+use sentinel_gateway::validation::SchemaCache;
 
 const MOCK_MCP_SERVER: &str = r#"
 import sys, json
@@ -118,8 +120,6 @@ async fn test_stdio_tools_call_through_dispatch() {
         },
     );
     let rbac = RbacConfig { roles };
-    let rate_limiter = RateLimiter::new(&RateLimitConfig::default());
-    let kill_switch = KillSwitchConfig::default();
     let circuit_breakers: HashMap<String, CircuitBreaker> = HashMap::new();
 
     // Leak for 'static lifetime (test pattern from existing tests)
@@ -127,8 +127,9 @@ async fn test_stdio_tools_call_through_dispatch() {
     let backends_map: &'static _ = Box::leak(Box::new(backends_map));
     let id_remapper: &'static _ = Box::leak(Box::new(id_remapper));
     let rbac: &'static _ = Box::leak(Box::new(rbac));
-    let rate_limiter: &'static _ = Box::leak(Box::new(rate_limiter));
-    let kill_switch: &'static _ = Box::leak(Box::new(kill_switch));
+    let hot_config = HotConfig::new(KillSwitchConfig::default(), RateLimiter::new(&RateLimitConfig::default())).shared();
+    let schema_cache = SchemaCache::from_catalog(catalog);
+    let schema_cache: &'static _ = Box::leak(Box::new(schema_cache));
     let circuit_breakers: &'static _ = Box::leak(Box::new(circuit_breakers));
 
     let cancel = CancellationToken::new();
@@ -139,7 +140,7 @@ async fn test_stdio_tools_call_through_dispatch() {
     tokio::spawn(async move {
         let _ = run_dispatch(
             in_rx, out_tx, catalog, backends_map, id_remapper, None, rbac, None,
-            rate_limiter, kill_switch, circuit_breakers, cancel,
+            hot_config, None, schema_cache, circuit_breakers, cancel,
         )
         .await;
     });

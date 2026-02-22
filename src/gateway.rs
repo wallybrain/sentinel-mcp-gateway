@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use rmcp::model::ListToolsResult;
 use serde_json::json;
@@ -11,15 +12,17 @@ use crate::auth::jwt::CallerIdentity;
 use crate::auth::rbac::{is_tool_allowed, Permission};
 use crate::backend::Backend;
 use crate::catalog::ToolCatalog;
-use crate::config::types::{KillSwitchConfig, RbacConfig};
+use crate::config::hot::SharedHotConfig;
+use crate::config::types::RbacConfig;
 use crate::health::circuit_breaker::CircuitBreaker;
+use crate::metrics::Metrics;
 use crate::protocol::id_remapper::IdRemapper;
 use crate::protocol::jsonrpc::{
     JsonRpcId, JsonRpcRequest, JsonRpcResponse, CIRCUIT_OPEN_ERROR, INTERNAL_ERROR, INVALID_PARAMS,
     KILL_SWITCH_ERROR, METHOD_NOT_FOUND, PARSE_ERROR, RATE_LIMIT_ERROR,
 };
 use crate::protocol::mcp::{handle_initialize, McpState};
-use crate::ratelimit::RateLimiter;
+use crate::validation::SchemaCache;
 
 const NOT_INITIALIZED_CODE: i32 = -32002;
 const AUTHZ_ERROR: i32 = -32003;
@@ -38,8 +41,9 @@ pub async fn run_dispatch(
     caller: Option<CallerIdentity>,
     rbac_config: &RbacConfig,
     audit_tx: Option<mpsc::Sender<AuditEntry>>,
-    rate_limiter: &RateLimiter,
-    kill_switch: &KillSwitchConfig,
+    hot_config: SharedHotConfig,
+    metrics: Option<Arc<Metrics>>,
+    schema_cache: &SchemaCache,
     circuit_breakers: &HashMap<String, CircuitBreaker>,
     cancel: CancellationToken,
 ) -> anyhow::Result<()> {
@@ -119,17 +123,18 @@ pub async fn run_dispatch(
             "tools/list" => {
                 if !is_notification {
                     let id = request.id.clone().unwrap_or(JsonRpcId::Null);
+                    let hc = hot_config.read().await;
                     let tools: Vec<_> = catalog
                         .all_tools()
                         .into_iter()
                         .filter(|tool| {
                             // Kill switch: hide disabled tools
-                            if kill_switch.disabled_tools.contains(&tool.name.to_string()) {
+                            if hc.kill_switch.disabled_tools.contains(&tool.name.to_string()) {
                                 return false;
                             }
                             // Kill switch: hide tools from disabled backends
                             if let Some(backend) = catalog.route(&tool.name) {
-                                if kill_switch.disabled_backends.contains(&backend.to_string()) {
+                                if hc.kill_switch.disabled_backends.contains(&backend.to_string()) {
                                     return false;
                                 }
                             }
@@ -142,6 +147,7 @@ pub async fn run_dispatch(
                             )
                         })
                         .collect();
+                    drop(hc);
                     let result = ListToolsResult::with_all_items(tools);
                     let value = serde_json::to_value(&result)
                         .expect("ListToolsResult serialization cannot fail");
@@ -161,43 +167,19 @@ pub async fn run_dispatch(
                         .and_then(|p| p.get("name"))
                         .and_then(|n| n.as_str());
                     if let Some(name) = tool_name {
-                        // Kill switch: tool disabled
-                        if kill_switch.disabled_tools.contains(&name.to_string()) {
-                            let resp = JsonRpcResponse::error(
-                                id.clone(),
-                                KILL_SWITCH_ERROR,
-                                format!("Tool is disabled: {name}"),
-                            );
-                            send_response(&tx, &resp).await;
+                        // 1. Kill switch check (read from hot config)
+                        {
+                            let hc = hot_config.read().await;
 
-                            if let Some(ref atx) = audit_tx {
-                                let entry = AuditEntry {
-                                    request_id,
-                                    timestamp: chrono::Utc::now(),
-                                    client_subject: caller.subject.clone(),
-                                    client_role: caller.role.clone(),
-                                    tool_name: name.to_string(),
-                                    backend_name: catalog.route(name).unwrap_or("unknown").to_string(),
-                                    request_args: request.params.clone(),
-                                    response_status: "killed".to_string(),
-                                    error_message: Some(format!("Tool is disabled: {name}")),
-                                    latency_ms: 0,
-                                };
-                                if let Err(e) = atx.try_send(entry) {
-                                    tracing::warn!(error = %e, "Audit channel full, dropping entry");
+                            // Kill switch: tool disabled
+                            if hc.kill_switch.disabled_tools.contains(&name.to_string()) {
+                                if let Some(ref m) = metrics {
+                                    m.record_request(name, "killed", 0.0);
                                 }
-                            }
-
-                            continue;
-                        }
-
-                        // Kill switch: backend disabled
-                        if let Some(backend_name) = catalog.route(name) {
-                            if kill_switch.disabled_backends.contains(&backend_name.to_string()) {
                                 let resp = JsonRpcResponse::error(
                                     id.clone(),
                                     KILL_SWITCH_ERROR,
-                                    format!("Backend is disabled: {backend_name}"),
+                                    format!("Tool is disabled: {name}"),
                                 );
                                 send_response(&tx, &resp).await;
 
@@ -208,10 +190,10 @@ pub async fn run_dispatch(
                                         client_subject: caller.subject.clone(),
                                         client_role: caller.role.clone(),
                                         tool_name: name.to_string(),
-                                        backend_name: backend_name.to_string(),
+                                        backend_name: catalog.route(name).unwrap_or("unknown").to_string(),
                                         request_args: request.params.clone(),
                                         response_status: "killed".to_string(),
-                                        error_message: Some(format!("Backend is disabled: {backend_name}")),
+                                        error_message: Some(format!("Tool is disabled: {name}")),
                                         latency_ms: 0,
                                     };
                                     if let Err(e) = atx.try_send(entry) {
@@ -221,46 +203,88 @@ pub async fn run_dispatch(
 
                                 continue;
                             }
-                        }
 
-                        // Rate limit check
-                        if let Err(retry_after) = rate_limiter.check(&caller.subject, name) {
-                            let resp = JsonRpcResponse::error_with_data(
-                                id.clone(),
-                                RATE_LIMIT_ERROR,
-                                format!("Rate limit exceeded for tool: {name}"),
-                                json!({"retryAfter": retry_after.ceil() as u64}),
-                            );
-                            send_response(&tx, &resp).await;
+                            // Kill switch: backend disabled
+                            if let Some(backend_name) = catalog.route(name) {
+                                if hc.kill_switch.disabled_backends.contains(&backend_name.to_string()) {
+                                    if let Some(ref m) = metrics {
+                                        m.record_request(name, "killed", 0.0);
+                                    }
+                                    let resp = JsonRpcResponse::error(
+                                        id.clone(),
+                                        KILL_SWITCH_ERROR,
+                                        format!("Backend is disabled: {backend_name}"),
+                                    );
+                                    send_response(&tx, &resp).await;
 
-                            if let Some(ref atx) = audit_tx {
-                                let entry = AuditEntry {
-                                    request_id,
-                                    timestamp: chrono::Utc::now(),
-                                    client_subject: caller.subject.clone(),
-                                    client_role: caller.role.clone(),
-                                    tool_name: name.to_string(),
-                                    backend_name: catalog.route(name).unwrap_or("unknown").to_string(),
-                                    request_args: request.params.clone(),
-                                    response_status: "rate_limited".to_string(),
-                                    error_message: Some(format!("Rate limit exceeded for tool: {name}")),
-                                    latency_ms: 0,
-                                };
-                                if let Err(e) = atx.try_send(entry) {
-                                    tracing::warn!(error = %e, "Audit channel full, dropping entry");
+                                    if let Some(ref atx) = audit_tx {
+                                        let entry = AuditEntry {
+                                            request_id,
+                                            timestamp: chrono::Utc::now(),
+                                            client_subject: caller.subject.clone(),
+                                            client_role: caller.role.clone(),
+                                            tool_name: name.to_string(),
+                                            backend_name: backend_name.to_string(),
+                                            request_args: request.params.clone(),
+                                            response_status: "killed".to_string(),
+                                            error_message: Some(format!("Backend is disabled: {backend_name}")),
+                                            latency_ms: 0,
+                                        };
+                                        if let Err(e) = atx.try_send(entry) {
+                                            tracing::warn!(error = %e, "Audit channel full, dropping entry");
+                                        }
+                                    }
+
+                                    continue;
                                 }
                             }
 
-                            continue;
-                        }
+                            // 2. Rate limit check
+                            if let Err(retry_after) = hc.rate_limiter.check(&caller.subject, name) {
+                                if let Some(ref m) = metrics {
+                                    m.record_request(name, "rate_limited", 0.0);
+                                    m.record_rate_limit_hit(name);
+                                }
+                                let resp = JsonRpcResponse::error_with_data(
+                                    id.clone(),
+                                    RATE_LIMIT_ERROR,
+                                    format!("Rate limit exceeded for tool: {name}"),
+                                    json!({"retryAfter": retry_after.ceil() as u64}),
+                                );
+                                send_response(&tx, &resp).await;
 
-                        // RBAC check
+                                if let Some(ref atx) = audit_tx {
+                                    let entry = AuditEntry {
+                                        request_id,
+                                        timestamp: chrono::Utc::now(),
+                                        client_subject: caller.subject.clone(),
+                                        client_role: caller.role.clone(),
+                                        tool_name: name.to_string(),
+                                        backend_name: catalog.route(name).unwrap_or("unknown").to_string(),
+                                        request_args: request.params.clone(),
+                                        response_status: "rate_limited".to_string(),
+                                        error_message: Some(format!("Rate limit exceeded for tool: {name}")),
+                                        latency_ms: 0,
+                                    };
+                                    if let Err(e) = atx.try_send(entry) {
+                                        tracing::warn!(error = %e, "Audit channel full, dropping entry");
+                                    }
+                                }
+
+                                continue;
+                            }
+                        } // drop hc read guard
+
+                        // 3. RBAC check (not hot-reloadable)
                         if !is_tool_allowed(
                             &caller.role,
                             name,
                             Permission::Execute,
                             rbac_config,
                         ) {
+                            if let Some(ref m) = metrics {
+                                m.record_request(name, "denied", 0.0);
+                            }
                             let resp = JsonRpcResponse::error(
                                 id,
                                 AUTHZ_ERROR,
@@ -289,10 +313,52 @@ pub async fn run_dispatch(
                             continue;
                         }
 
-                        // Circuit breaker check
+                        // 4. Schema validation (after RBAC, before circuit breaker)
+                        if let Some(arguments) = request.params.as_ref().and_then(|p| p.get("arguments")) {
+                            if let Err(errors) = schema_cache.validate(name, arguments) {
+                                let error_msg = format!(
+                                    "Invalid arguments for tool {name}: {}",
+                                    errors.join("; ")
+                                );
+                                if let Some(ref m) = metrics {
+                                    m.record_request(name, "invalid_args", 0.0);
+                                }
+                                let resp = JsonRpcResponse::error(
+                                    id.clone(),
+                                    INVALID_PARAMS,
+                                    error_msg.clone(),
+                                );
+                                send_response(&tx, &resp).await;
+
+                                if let Some(ref atx) = audit_tx {
+                                    let entry = AuditEntry {
+                                        request_id,
+                                        timestamp: chrono::Utc::now(),
+                                        client_subject: caller.subject.clone(),
+                                        client_role: caller.role.clone(),
+                                        tool_name: name.to_string(),
+                                        backend_name: catalog.route(name).unwrap_or("unknown").to_string(),
+                                        request_args: request.params.clone(),
+                                        response_status: "invalid_args".to_string(),
+                                        error_message: Some(error_msg),
+                                        latency_ms: 0,
+                                    };
+                                    if let Err(e) = atx.try_send(entry) {
+                                        tracing::warn!(error = %e, "Audit channel full, dropping entry");
+                                    }
+                                }
+
+                                continue;
+                            }
+                        }
+
+                        // 5. Circuit breaker check
                         if let Some(backend_name) = catalog.route(name) {
                             if let Some(cb) = circuit_breakers.get(backend_name) {
                                 if !cb.allow_request() {
+                                    if let Some(ref m) = metrics {
+                                        m.record_request(name, "circuit_open", 0.0);
+                                    }
                                     let resp = JsonRpcResponse::error(
                                         id.clone(),
                                         CIRCUIT_OPEN_ERROR,
@@ -323,10 +389,20 @@ pub async fn run_dispatch(
                             }
                         }
                     }
+
+                    // 6. Backend dispatch
                     let resp =
                         handle_tools_call(id, request.params.clone(), catalog, backends, id_remapper, circuit_breakers)
                             .await;
                     let latency_ms = start.elapsed().as_millis() as i64;
+                    let latency_secs = start.elapsed().as_secs_f64();
+
+                    // Record metrics for backend response
+                    if let Some(ref m) = metrics {
+                        let tool = tool_name.unwrap_or("unknown");
+                        let status_str = if resp.error.is_some() { "error" } else { "success" };
+                        m.record_request(tool, status_str, latency_secs);
+                    }
 
                     if let Some(ref atx) = audit_tx {
                         let tool = tool_name.unwrap_or("unknown").to_string();
