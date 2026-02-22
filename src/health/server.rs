@@ -26,6 +26,7 @@ pub type BackendHealthMap = Arc<RwLock<HashMap<String, BackendHealth>>>;
 pub struct HealthAppState {
     pub health_map: BackendHealthMap,
     pub metrics: Option<Arc<Metrics>>,
+    pub health_token: Option<String>,
 }
 
 async fn liveness() -> Json<Value> {
@@ -50,7 +51,26 @@ async fn readiness(State(state): State<HealthAppState>) -> (StatusCode, Json<Val
     }
 }
 
-async fn metrics_handler(State(state): State<HealthAppState>) -> impl IntoResponse {
+async fn metrics_handler(
+    State(state): State<HealthAppState>,
+    headers: axum::http::HeaderMap,
+) -> impl IntoResponse {
+    if let Some(ref expected) = state.health_token {
+        let provided = headers
+            .get(header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "));
+        match provided {
+            Some(token) if token == expected => {}
+            _ => {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+                    "Unauthorized".to_string(),
+                )
+            }
+        }
+    }
     match &state.metrics {
         Some(m) => (
             StatusCode::OK,
@@ -71,10 +91,12 @@ async fn metrics_handler(State(state): State<HealthAppState>) -> impl IntoRespon
 pub fn build_health_router(
     health_map: BackendHealthMap,
     metrics: Option<Arc<Metrics>>,
+    health_token: Option<String>,
 ) -> Router {
     let state = HealthAppState {
         health_map,
         metrics,
+        health_token,
     };
     Router::new()
         .route("/health", get(liveness))
@@ -87,9 +109,10 @@ pub async fn run_health_server(
     addr: &str,
     health_map: BackendHealthMap,
     metrics: Option<Arc<Metrics>>,
+    health_token: Option<String>,
     cancel: CancellationToken,
 ) -> anyhow::Result<()> {
-    let app = build_health_router(health_map, metrics);
+    let app = build_health_router(health_map, metrics, health_token);
 
     let listener = TcpListener::bind(addr).await?;
     tracing::info!(addr = %addr, "Health server listening");
@@ -112,7 +135,7 @@ mod tests {
     }
 
     fn build_app(health_map: BackendHealthMap) -> Router {
-        build_health_router(health_map, None)
+        build_health_router(health_map, None, None)
     }
 
     #[tokio::test]
@@ -181,7 +204,7 @@ mod tests {
     async fn test_metrics_endpoint_returns_prometheus_text() {
         let metrics = Arc::new(Metrics::new());
         metrics.record_request("echo", "success", 0.01);
-        let app = build_health_router(make_health_map(), Some(metrics));
+        let app = build_health_router(make_health_map(), Some(metrics), None);
         let req = Request::builder()
             .uri("/metrics")
             .body(Body::empty())
@@ -198,12 +221,69 @@ mod tests {
 
     #[tokio::test]
     async fn test_metrics_endpoint_returns_404_when_disabled() {
-        let app = build_health_router(make_health_map(), None);
+        let app = build_health_router(make_health_map(), None, None);
         let req = Request::builder()
             .uri("/metrics")
             .body(Body::empty())
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn metrics_requires_auth_when_token_set() {
+        let metrics = Arc::new(Metrics::new());
+        metrics.record_request("echo", "success", 0.01);
+        let app =
+            build_health_router(make_health_map(), Some(metrics), Some("test-token".to_string()));
+        let req = Request::builder()
+            .uri("/metrics")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn metrics_accessible_with_valid_token() {
+        let metrics = Arc::new(Metrics::new());
+        metrics.record_request("echo", "success", 0.01);
+        let app =
+            build_health_router(make_health_map(), Some(metrics), Some("test-token".to_string()));
+        let req = Request::builder()
+            .uri("/metrics")
+            .header("Authorization", "Bearer test-token")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn metrics_rejects_wrong_token() {
+        let metrics = Arc::new(Metrics::new());
+        metrics.record_request("echo", "success", 0.01);
+        let app =
+            build_health_router(make_health_map(), Some(metrics), Some("test-token".to_string()));
+        let req = Request::builder()
+            .uri("/metrics")
+            .header("Authorization", "Bearer wrong-token")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn metrics_open_when_no_token_configured() {
+        let metrics = Arc::new(Metrics::new());
+        metrics.record_request("echo", "success", 0.01);
+        let app = build_health_router(make_health_map(), Some(metrics), None);
+        let req = Request::builder()
+            .uri("/metrics")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
     }
 }

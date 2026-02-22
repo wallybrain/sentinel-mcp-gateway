@@ -176,7 +176,7 @@ async fn test_health_endpoint_liveness() {
     let cancel_server = cancel.clone();
     tokio::spawn(async move {
         use sentinel_gateway::health::server::build_health_router;
-        let app = build_health_router(hm, None);
+        let app = build_health_router(hm, None, None);
         axum::serve(listener, app)
             .with_graceful_shutdown(cancel_server.cancelled_owned())
             .await
@@ -210,7 +210,7 @@ async fn test_health_endpoint_readiness_no_backends() {
     let cancel_server = cancel.clone();
     tokio::spawn(async move {
         use sentinel_gateway::health::server::build_health_router;
-        let app = build_health_router(hm, None);
+        let app = build_health_router(hm, None, None);
         axum::serve(listener, app)
             .with_graceful_shutdown(cancel_server.cancelled_owned())
             .await
@@ -251,7 +251,7 @@ async fn test_health_endpoint_readiness_with_healthy_backend() {
     let cancel_server = cancel.clone();
     tokio::spawn(async move {
         use sentinel_gateway::health::server::build_health_router;
-        let app = build_health_router(hm, None);
+        let app = build_health_router(hm, None, None);
         axum::serve(listener, app)
             .with_graceful_shutdown(cancel_server.cancelled_owned())
             .await

@@ -294,7 +294,8 @@ async fn main() -> anyhow::Result<()> {
     let metrics_server = metrics.clone();
     let cancel_server = cancel.clone();
     tokio::spawn(async move {
-        if let Err(e) = run_health_server(&health_addr, health_map_server, Some(metrics_server), cancel_server).await {
+        let health_token = std::env::var("HEALTH_TOKEN").ok();
+        if let Err(e) = run_health_server(&health_addr, health_map_server, Some(metrics_server), health_token, cancel_server).await {
             tracing::error!(error = %e, "Health server exited with error");
         }
     });
