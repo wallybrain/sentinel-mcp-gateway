@@ -55,7 +55,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. A `tools/call` request for an n8n tool reaches the n8n MCP server and returns the correct response
   2. A `tools/call` request for a sqlite tool reaches the sqlite MCP server and returns the correct response
-  3. SSE (text/event-stream) responses from backends stream through the gateway without buffering
+  3. SSE (text/event-stream) responses from backends are parsed incrementally and forwarded (MCP uses single-event SSE frames)
   4. A backend timeout or transient error triggers automatic retry with exponential backoff and jitter
   5. Idle HTTP connections are reused (connection pooling) and stale connections are cleaned up
 **Plans:** 2 plans
