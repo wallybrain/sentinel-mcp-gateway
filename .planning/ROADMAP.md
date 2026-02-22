@@ -49,11 +49,11 @@
   3. Sentinel gateway can reach mcp-n8n and mcp-sqlite by hostname over a shared Docker network
   4. Production .env with JWT secret and Postgres credentials exists on VPS (not in git)
   5. Sentinel health endpoint returns 200 while ContextForge is still running on port 9200
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 10-01: TBD
-- [ ] 10-02: TBD
+- [ ] 10-01-PLAN.md -- Port fix, sidecar migration, Docker networking, production .env
+- [ ] 10-02-PLAN.md -- Build and start Sentinel stack alongside ContextForge, verify health
 
 ### Phase 11: Cutover Execution
 **Goal**: Sentinel is the live MCP gateway on port 9200 with all 7 backends verified and rollback tested
