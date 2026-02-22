@@ -7,9 +7,10 @@ use tokio::time::{timeout, Duration};
 use sentinel_gateway::auth::jwt::CallerIdentity;
 use sentinel_gateway::backend::HttpBackend;
 use sentinel_gateway::catalog::create_stub_catalog;
-use sentinel_gateway::config::types::{RbacConfig, RoleConfig};
+use sentinel_gateway::config::types::{KillSwitchConfig, RateLimitConfig, RbacConfig, RoleConfig};
 use sentinel_gateway::gateway::run_dispatch;
 use sentinel_gateway::protocol::id_remapper::IdRemapper;
+use sentinel_gateway::ratelimit::RateLimiter;
 
 fn default_admin_rbac() -> RbacConfig {
     let mut roles = HashMap::new();
@@ -76,6 +77,18 @@ async fn spawn_dispatch_with_caller(
     caller: Option<CallerIdentity>,
     rbac: &'static RbacConfig,
 ) -> (mpsc::Sender<String>, mpsc::Receiver<String>) {
+    let rate_limiter: &'static _ = Box::leak(Box::new(RateLimiter::new(&RateLimitConfig::default())));
+    let kill_switch: &'static _ = Box::leak(Box::new(KillSwitchConfig::default()));
+    spawn_dispatch_with_config(caller, rbac, rate_limiter, kill_switch).await
+}
+
+/// Spawn dispatch with full config control (caller, RBAC, rate limiter, kill switch).
+async fn spawn_dispatch_with_config(
+    caller: Option<CallerIdentity>,
+    rbac: &'static RbacConfig,
+    rate_limiter: &'static RateLimiter,
+    kill_switch: &'static KillSwitchConfig,
+) -> (mpsc::Sender<String>, mpsc::Receiver<String>) {
     let catalog = create_stub_catalog();
     let catalog: &'static _ = Box::leak(Box::new(catalog));
 
@@ -89,8 +102,11 @@ async fn spawn_dispatch_with_caller(
     let (out_tx, out_rx) = mpsc::channel::<String>(64);
 
     tokio::spawn(async move {
-        let _ =
-            run_dispatch(in_rx, out_tx, catalog, backends, id_remapper, caller, rbac, None).await;
+        let _ = run_dispatch(
+            in_rx, out_tx, catalog, backends, id_remapper, caller, rbac, None,
+            rate_limiter, kill_switch,
+        )
+        .await;
     });
 
     (in_tx, out_rx)
@@ -347,11 +363,20 @@ async fn test_tools_call_backend_not_in_map_returns_internal_error() {
     let rbac = default_admin_rbac();
     let rbac: &'static _ = Box::leak(Box::new(rbac));
 
+    let rate_limiter = RateLimiter::new(&RateLimitConfig::default());
+    let rate_limiter: &'static _ = Box::leak(Box::new(rate_limiter));
+    let kill_switch = KillSwitchConfig::default();
+    let kill_switch: &'static _ = Box::leak(Box::new(kill_switch));
+
     let (in_tx, in_rx) = mpsc::channel::<String>(64);
     let (out_tx, mut out_rx) = mpsc::channel::<String>(64);
 
     tokio::spawn(async move {
-        let _ = run_dispatch(in_rx, out_tx, catalog, backends, id_remapper, None, rbac, None).await;
+        let _ = run_dispatch(
+            in_rx, out_tx, catalog, backends, id_remapper, None, rbac, None,
+            rate_limiter, kill_switch,
+        )
+        .await;
     });
 
     // Handshake
@@ -577,4 +602,197 @@ async fn test_dispatch_accepts_none_audit_tx() {
         error["code"], -32603,
         "tools/call with None audit_tx should still work (backend unavailable)"
     );
+}
+
+// --- Kill switch integration tests ---
+
+#[tokio::test]
+async fn test_kill_switch_tool_disabled_returns_error() {
+    let rbac: &'static _ = Box::leak(Box::new(default_admin_rbac()));
+    let rate_limiter: &'static _ = Box::leak(Box::new(RateLimiter::new(&RateLimitConfig::default())));
+    let kill_switch: &'static _ = Box::leak(Box::new(KillSwitchConfig {
+        disabled_tools: vec!["read_query".to_string()],
+        disabled_backends: vec![],
+    }));
+
+    let (tx, mut rx) = spawn_dispatch_with_config(None, rbac, rate_limiter, kill_switch).await;
+    do_handshake(&tx, &mut rx).await;
+
+    let req = json!({
+        "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+        "params": {"name": "read_query", "arguments": {"query": "SELECT 1"}}
+    })
+    .to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let error = resp.get("error").expect("should have error");
+    assert_eq!(error["code"], -32005, "disabled tool returns KILL_SWITCH_ERROR");
+    assert!(
+        error["message"].as_str().unwrap().contains("disabled"),
+        "message should mention disabled"
+    );
+}
+
+#[tokio::test]
+async fn test_kill_switch_tool_hidden_from_list() {
+    let rbac: &'static _ = Box::leak(Box::new(default_admin_rbac()));
+    let rate_limiter: &'static _ = Box::leak(Box::new(RateLimiter::new(&RateLimitConfig::default())));
+    let kill_switch: &'static _ = Box::leak(Box::new(KillSwitchConfig {
+        disabled_tools: vec!["read_query".to_string()],
+        disabled_backends: vec![],
+    }));
+
+    let (tx, mut rx) = spawn_dispatch_with_config(None, rbac, rate_limiter, kill_switch).await;
+    do_handshake(&tx, &mut rx).await;
+
+    let req = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let tools = resp["result"]["tools"].as_array().expect("tools array");
+    let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
+    assert!(!names.contains(&"read_query"), "disabled tool hidden from list");
+    assert!(names.contains(&"write_query"), "other tools still present");
+    assert_eq!(tools.len(), 3, "3 tools visible (read_query hidden)");
+}
+
+#[tokio::test]
+async fn test_kill_switch_backend_disabled_returns_error() {
+    let rbac: &'static _ = Box::leak(Box::new(default_admin_rbac()));
+    let rate_limiter: &'static _ = Box::leak(Box::new(RateLimiter::new(&RateLimitConfig::default())));
+    let kill_switch: &'static _ = Box::leak(Box::new(KillSwitchConfig {
+        disabled_tools: vec![],
+        disabled_backends: vec!["stub-sqlite".to_string()],
+    }));
+
+    let (tx, mut rx) = spawn_dispatch_with_config(None, rbac, rate_limiter, kill_switch).await;
+    do_handshake(&tx, &mut rx).await;
+
+    let req = json!({
+        "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+        "params": {"name": "read_query", "arguments": {"query": "SELECT 1"}}
+    })
+    .to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let error = resp.get("error").expect("should have error");
+    assert_eq!(error["code"], -32005, "disabled backend returns KILL_SWITCH_ERROR");
+    assert!(
+        error["message"].as_str().unwrap().contains("disabled"),
+        "message should mention disabled"
+    );
+}
+
+#[tokio::test]
+async fn test_kill_switch_backend_disabled_hides_tools_from_list() {
+    let rbac: &'static _ = Box::leak(Box::new(default_admin_rbac()));
+    let rate_limiter: &'static _ = Box::leak(Box::new(RateLimiter::new(&RateLimitConfig::default())));
+    let kill_switch: &'static _ = Box::leak(Box::new(KillSwitchConfig {
+        disabled_tools: vec![],
+        disabled_backends: vec!["stub-sqlite".to_string()],
+    }));
+
+    let (tx, mut rx) = spawn_dispatch_with_config(None, rbac, rate_limiter, kill_switch).await;
+    do_handshake(&tx, &mut rx).await;
+
+    let req = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let tools = resp["result"]["tools"].as_array().expect("tools array");
+    let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
+    assert!(!names.contains(&"read_query"), "sqlite tool hidden");
+    assert!(!names.contains(&"write_query"), "sqlite tool hidden");
+    assert!(names.contains(&"list_workflows"), "n8n tool still visible");
+    assert!(names.contains(&"execute_workflow"), "n8n tool still visible");
+    assert_eq!(tools.len(), 2, "only n8n tools visible");
+}
+
+// --- Rate limit integration tests ---
+
+#[tokio::test]
+async fn test_rate_limit_exceeded_returns_error() {
+    let rbac: &'static _ = Box::leak(Box::new(default_admin_rbac()));
+    let rate_limiter: &'static _ = Box::leak(Box::new(RateLimiter::new(&RateLimitConfig {
+        default_rpm: 2,
+        per_tool: HashMap::new(),
+    })));
+    let kill_switch: &'static _ = Box::leak(Box::new(KillSwitchConfig::default()));
+
+    let (tx, mut rx) = spawn_dispatch_with_config(None, rbac, rate_limiter, kill_switch).await;
+    do_handshake(&tx, &mut rx).await;
+
+    // First two calls should NOT return rate limit error (they hit backend error instead)
+    for i in 1..=2 {
+        let req = json!({
+            "jsonrpc": "2.0", "id": i, "method": "tools/call",
+            "params": {"name": "read_query", "arguments": {"query": "SELECT 1"}}
+        })
+        .to_string();
+        let resp = send_and_recv(&tx, &mut rx, &req).await;
+        let error = resp.get("error");
+        if let Some(err) = error {
+            assert_ne!(
+                err["code"], -32004,
+                "call {i} should not be rate limited"
+            );
+        }
+    }
+
+    // Third call should be rate limited
+    let req = json!({
+        "jsonrpc": "2.0", "id": 3, "method": "tools/call",
+        "params": {"name": "read_query", "arguments": {"query": "SELECT 1"}}
+    })
+    .to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let error = resp.get("error").expect("should have error");
+    assert_eq!(error["code"], -32004, "third call returns RATE_LIMIT_ERROR");
+    let retry_after = error["data"]["retryAfter"].as_u64().expect("retryAfter should be integer");
+    assert!(retry_after > 0, "retryAfter should be positive");
+}
+
+#[tokio::test]
+async fn test_rate_limit_per_tool_override() {
+    let mut per_tool = HashMap::new();
+    per_tool.insert("read_query".to_string(), 1u32);
+
+    let rbac: &'static _ = Box::leak(Box::new(default_admin_rbac()));
+    let rate_limiter: &'static _ = Box::leak(Box::new(RateLimiter::new(&RateLimitConfig {
+        default_rpm: 100,
+        per_tool,
+    })));
+    let kill_switch: &'static _ = Box::leak(Box::new(KillSwitchConfig::default()));
+
+    let (tx, mut rx) = spawn_dispatch_with_config(None, rbac, rate_limiter, kill_switch).await;
+    do_handshake(&tx, &mut rx).await;
+
+    // First call to read_query passes (hits backend error)
+    let req = json!({
+        "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+        "params": {"name": "read_query", "arguments": {"query": "SELECT 1"}}
+    })
+    .to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    if let Some(err) = resp.get("error") {
+        assert_ne!(err["code"], -32004, "first call should not be rate limited");
+    }
+
+    // Second call to read_query is rate limited
+    let req = json!({
+        "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+        "params": {"name": "read_query", "arguments": {"query": "SELECT 1"}}
+    })
+    .to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let error = resp.get("error").expect("should have error");
+    assert_eq!(error["code"], -32004, "second read_query call is rate limited");
+
+    // Call to list_workflows still works (uses default 100 RPM)
+    let req = json!({
+        "jsonrpc": "2.0", "id": 3, "method": "tools/call",
+        "params": {"name": "list_workflows", "arguments": {}}
+    })
+    .to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    if let Some(err) = resp.get("error") {
+        assert_ne!(
+            err["code"], -32004,
+            "list_workflows should not be rate limited (default 100 RPM)"
+        );
+    }
 }
