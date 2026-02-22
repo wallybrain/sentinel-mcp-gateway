@@ -7,6 +7,8 @@ pub enum BackendError {
     Stream(reqwest::Error),
     NoDataInSse,
     InvalidResponse(String),
+    ProcessExited(String),
+    StdinClosed,
 }
 
 impl BackendError {
@@ -17,6 +19,8 @@ impl BackendError {
             BackendError::Stream(_) => true,
             BackendError::NoDataInSse => false,
             BackendError::InvalidResponse(_) => false,
+            BackendError::ProcessExited(_) => false,
+            BackendError::StdinClosed => false,
         }
     }
 }
@@ -31,6 +35,8 @@ impl fmt::Display for BackendError {
             BackendError::Stream(e) => write!(f, "stream error: {e}"),
             BackendError::NoDataInSse => write!(f, "no data line found in SSE response"),
             BackendError::InvalidResponse(msg) => write!(f, "invalid response: {msg}"),
+            BackendError::ProcessExited(msg) => write!(f, "child process exited: {msg}"),
+            BackendError::StdinClosed => write!(f, "stdin channel to child process is closed"),
         }
     }
 }
