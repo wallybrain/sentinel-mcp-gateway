@@ -134,7 +134,7 @@ Plans:
 **Plans:** 3 plans
 Plans:
 - [x] 08-01-PLAN.md -- StdioBackend struct with multiplexer, process group spawn/kill, and unit tests
-- [ ] 08-02-PLAN.md -- Supervisor task with crash detection, exponential backoff restart, and MCP handshake
+- [x] 08-02-PLAN.md -- Supervisor task with crash detection, exponential backoff restart, and MCP handshake
 - [ ] 08-03-PLAN.md -- Wire stdio into gateway dispatch and main.rs with Backend enum and integration tests
 
 ### Phase 9: Observability & Hot Reload
@@ -171,7 +171,7 @@ Plans:
 | 5. Audit Logging | 2/2 | Complete    | 2026-02-22 |
 | 6. Rate Limiting & Kill Switch | 2/2 | Complete    | 2026-02-22 |
 | 7. Health & Reliability | 2/2 | Complete    | 2026-02-22 |
-| 8. stdio Backend Management | 1/3 | In Progress | - |
+| 8. stdio Backend Management | 2/3 | In Progress | - |
 | 9. Observability & Hot Reload | 0/? | Not started | - |
 | 10. Deployment & Integration | 0/? | Not started | - |
 

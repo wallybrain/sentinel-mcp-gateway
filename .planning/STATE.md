@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 8 in progress -- StdioBackend core implemented (08-01 complete) |
+| Current Focus | Phase 8 in progress -- supervisor + MCP handshake implemented (08-02 complete) |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -14,8 +14,8 @@
 | Field | Value |
 |-------|-------|
 | Phase | 08-stdio-backend |
-| Plan | 02 |
-| Status | Phase 8 in progress (1/3 plans complete) |
+| Plan | 03 |
+| Status | Phase 8 in progress (2/3 plans complete) |
 
 **Overall Progress:**
 ```
@@ -26,7 +26,7 @@ Phase  4 [x] Authentication & Authorization (2/2 plans)
 Phase  5 [x] Audit Logging (2/2 plans)
 Phase  6 [x] Rate Limiting & Kill Switch (2/2 plans)
 Phase  7 [x] Health & Reliability (2/2 plans)
-Phase  8 [~] stdio Backend Management (1/3 plans)
+Phase  8 [~] stdio Backend Management (2/3 plans)
 Phase  9 [ ] Observability & Hot Reload
 Phase 10 [ ] Deployment & Integration
 ```
@@ -36,8 +36,8 @@ Phase 10 [ ] Deployment & Integration
 | Metric | Value |
 |--------|-------|
 | Phases completed | 7/10 |
-| Plans completed | 15/? |
-| Requirements completed | 39/47 |
+| Plans completed | 16/? |
+| Requirements completed | 41/47 |
 | Session count | 7 |
 
 | Phase | Plan | Duration | Tasks | Files |
@@ -55,6 +55,7 @@ Phase 10 [ ] Deployment & Integration
 | 07 | 01 | 6min | 2 | 10 |
 | 07 | 02 | 17min | 2 | 6 |
 | 08 | 01 | 3min | 2 | 4 |
+| 08 | 02 | 12min | 2 | 2 |
 
 ## Accumulated Context
 
@@ -102,6 +103,10 @@ Phase 10 [ ] Deployment & Integration
 - process_group(0) + kill_on_drop(false) for explicit stdio process lifecycle management
 - Individual env() calls to preserve parent environment inheritance
 - Bounded mpsc(64) channel for stdin writes (backpressure on stalled child)
+- Backoff jitter 0-50% of capped delay prevents synchronized restart storms
+- Restart counter resets after 60s healthy operation (transient crashes don't accumulate)
+- MCP handshake failure treated same as crash (kill child, backoff, restart)
+- Tools channel sends backend clone for catalog/map updates after handshake
 
 ### Known Gotchas
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -117,16 +122,16 @@ Phase 10 [ ] Deployment & Integration
 - None
 
 ### TODOs
-- Execute Phase 8 plans 02 and 03 (supervisor + gateway integration)
+- Execute Phase 8 plan 03 (gateway integration with Backend enum)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 08-01-PLAN.md -- StdioBackend core with spawn/send/kill, nix dependency, 3 unit tests passing
-- **Stopped at:** Completed 08-01-PLAN.md (Phase 8: 1/3 plans)
-- **Next step:** Execute 08-02-PLAN.md (supervisor with crash detection and restart)
+- **What happened:** Executed 08-02-PLAN.md -- supervisor with crash detection, exponential backoff, MCP handshake, 3 new tests (6 total)
+- **Stopped at:** Completed 08-02-PLAN.md (Phase 8: 2/3 plans)
+- **Next step:** Execute 08-03-PLAN.md (wire stdio into gateway dispatch with Backend enum)
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22T06:36Z*
+*Last updated: 2026-02-22T06:51Z*

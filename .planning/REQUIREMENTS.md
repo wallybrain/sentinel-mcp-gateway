@@ -29,8 +29,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### stdio Backend Management
 
 - [x] **STDIO-01**: Gateway spawns stdio backend processes from config (command + args + env vars)
-- [ ] **STDIO-02**: Gateway manages stdio backend lifecycle (health monitoring, crash detection)
-- [ ] **STDIO-03**: Gateway restarts crashed stdio backends with exponential backoff
+- [x] **STDIO-02**: Gateway manages stdio backend lifecycle (health monitoring, crash detection)
+- [x] **STDIO-03**: Gateway restarts crashed stdio backends with exponential backoff
 - [x] **STDIO-04**: Gateway multiplexes concurrent JSON-RPC requests over a single stdio backend's stdin/stdout using request ID correlation
 - [x] **STDIO-05**: Gateway cleanly terminates stdio backends on shutdown (process group kill, not just direct child)
 
@@ -151,8 +151,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ROUTE-03 | Phase 3 | Complete |
 | ROUTE-04 | Phase 3 | Complete |
 | STDIO-01 | Phase 8 | Pending |
-| STDIO-02 | Phase 8 | Pending |
-| STDIO-03 | Phase 8 | Pending |
+| STDIO-02 | Phase 8 | Complete |
+| STDIO-03 | Phase 8 | Complete |
 | STDIO-04 | Phase 8 | Pending |
 | STDIO-05 | Phase 8 | Pending |
 | PROTO-01 | Phase 1 | Complete |
