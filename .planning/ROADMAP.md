@@ -9,7 +9,7 @@
 
 - [x] **Phase 1: Foundation & Config** - Compiling binary with TOML config, JSON-RPC 2.0 types, and request ID remapping
 - [x] **Phase 2: MCP Protocol Layer** - MCP lifecycle state machine, tool catalog aggregation, and stdio upstream transport
-- [ ] **Phase 3: HTTP Backend Routing** - Route tool calls to HTTP backends with connection pooling, retries, and SSE passthrough
+- [x] **Phase 3: HTTP Backend Routing** - Route tool calls to HTTP backends with connection pooling, retries, and SSE passthrough
 - [ ] **Phase 4: Authentication & Authorization** - JWT validation and per-tool per-role RBAC on every request
 - [ ] **Phase 5: Audit Logging** - Structured audit trail to Postgres with async writes and auto-migrations
 - [ ] **Phase 6: Rate Limiting & Kill Switch** - Per-client per-tool token bucket and per-tool/backend disable switches
@@ -61,7 +61,7 @@ Plans:
 **Plans:** 2 plans
 Plans:
 - [x] 03-01-PLAN.md -- HttpBackend struct, SSE parser, retry logic, and BackendError types
-- [ ] 03-02-PLAN.md -- Wire tools/call routing into dispatch loop and backend discovery into main.rs
+- [x] 03-02-PLAN.md -- Wire tools/call routing into dispatch loop and backend discovery into main.rs
 
 ### Phase 4: Authentication & Authorization
 **Goal**: Every request is authenticated via JWT and authorized against per-tool per-role RBAC rules
@@ -150,7 +150,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Foundation & Config | 2/2 | Complete | 2026-02-22 |
 | 2. MCP Protocol Layer | 2/2 | Complete | 2026-02-22 |
-| 3. HTTP Backend Routing | 1/2 | In Progress | - |
+| 3. HTTP Backend Routing | 2/2 | Complete | 2026-02-22 |
 | 4. Authentication & Authorization | 0/? | Not started | - |
 | 5. Audit Logging | 0/? | Not started | - |
 | 6. Rate Limiting & Kill Switch | 0/? | Not started | - |
@@ -161,4 +161,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-02-22*
-*Last updated: 2026-02-22T03:25Z*
+*Last updated: 2026-02-22T03:31Z*

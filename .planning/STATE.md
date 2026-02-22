@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 2 complete -- ready for Phase 3 (HTTP Backend Routing) |
+| Current Focus | Phase 3 complete -- ready for Phase 4 (Authentication & Authorization) |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -13,15 +13,15 @@
 
 | Field | Value |
 |-------|-------|
-| Phase | 03-http-backend-routing (in progress) |
-| Plan | 03-01 (complete) |
-| Status | Phase 3 in progress (1/2 plans) |
+| Phase | 03-http-backend-routing (complete) |
+| Plan | 03-02 (complete) |
+| Status | Phase 3 complete (2/2 plans) -- ready for Phase 4 |
 
 **Overall Progress:**
 ```
 Phase  1 [x] Foundation & Config (2/2 plans)
 Phase  2 [x] MCP Protocol Layer (2/2 plans)
-Phase  3 [~] HTTP Backend Routing (1/2 plans)
+Phase  3 [x] HTTP Backend Routing (2/2 plans)
 Phase  4 [ ] Authentication & Authorization
 Phase  5 [ ] Audit Logging
 Phase  6 [ ] Rate Limiting & Kill Switch
@@ -35,9 +35,9 @@ Phase 10 [ ] Deployment & Integration
 
 | Metric | Value |
 |--------|-------|
-| Phases completed | 2/10 |
-| Plans completed | 5/? |
-| Requirements completed | 11/47 |
+| Phases completed | 3/10 |
+| Plans completed | 6/? |
+| Requirements completed | 13/47 |
 | Session count | 5 |
 
 | Phase | Plan | Duration | Tasks | Files |
@@ -45,6 +45,7 @@ Phase 10 [ ] Deployment & Integration
 | 02 | 01 | 5min | 2 | 8 |
 | 02 | 02 | 4min | 2 | 7 |
 | 03 | 01 | 5min | 2 | 9 |
+| 03 | 02 | 4min | 2 | 6 |
 
 ## Accumulated Context
 
@@ -63,6 +64,8 @@ Phase 10 [ ] Deployment & Integration
 - Lenient config loading (load_config_lenient) skips auth/postgres validation for early phases
 - Tool collision resolution prefixes with backend_name__tool_name
 - reqwest 0.12 (not 0.13) because 0.13 lacks rustls-tls feature
+- Stub catalog fallback when no HTTP backends reachable (binary always starts)
+- discover_tools() in backend/http.rs (collocated with HttpBackend)
 
 ### Known Gotchas
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -78,16 +81,16 @@ Phase 10 [ ] Deployment & Integration
 - None
 
 ### TODOs
-- Execute Phase 3 Plan 02 (wire HTTP backend into dispatch loop)
+- Plan Phase 4 (Authentication & Authorization)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 03-01-PLAN.md -- HTTP backend module with SSE parser, retry logic, error types, 13 new tests (54 total)
-- **Stopped at:** Completed 03-01-PLAN.md
-- **Next step:** Execute 03-02-PLAN.md (wire HTTP backend into dispatch loop)
+- **What happened:** Executed 03-02-PLAN.md -- tools/call dispatch routing, backend discovery, ID remapping, 6 new tests (60 total)
+- **Stopped at:** Completed 03-02-PLAN.md (Phase 3 complete)
+- **Next step:** Plan Phase 4 (Authentication & Authorization)
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22T03:25Z*
+*Last updated: 2026-02-22T03:31Z*

@@ -21,7 +21,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Routing
 
-- [ ] **ROUTE-01**: Gateway routes `tools/call` requests to the correct HTTP backend based on tool name
+- [x] **ROUTE-01**: Gateway routes `tools/call` requests to the correct HTTP backend based on tool name
 - [ ] **ROUTE-02**: Gateway routes `tools/call` requests to the correct stdio backend based on tool name
 - [ ] **ROUTE-03**: Gateway handles connection pooling, keep-alive, and configurable timeouts for HTTP backends
 - [ ] **ROUTE-04**: Gateway retries failed HTTP backend requests with exponential backoff and jitter
@@ -40,7 +40,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **PROTO-02**: Gateway handles MCP initialize handshake and responds with merged capabilities
 - [x] **PROTO-03**: Gateway handles `tools/list` by aggregating schemas from all backends into one catalog
 - [x] **PROTO-04**: Gateway remaps JSON-RPC request IDs to prevent collisions between backends
-- [ ] **PROTO-05**: Gateway proxies SSE (text/event-stream) responses from backends without buffering
+- [x] **PROTO-05**: Gateway proxies SSE (text/event-stream) responses from backends without buffering
 - [x] **PROTO-06**: Gateway accepts MCP requests via stdio transport (newline-delimited JSON-RPC on stdin/stdout)
 
 ### Audit
@@ -146,7 +146,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTHZ-01 | Phase 4 | Pending |
 | AUTHZ-02 | Phase 4 | Pending |
 | AUTHZ-03 | Phase 4 | Pending |
-| ROUTE-01 | Phase 3 | Pending |
+| ROUTE-01 | Phase 3 | Complete |
 | ROUTE-02 | Phase 8 | Pending |
 | ROUTE-03 | Phase 3 | Pending |
 | ROUTE-04 | Phase 3 | Pending |
@@ -159,7 +159,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROTO-02 | Phase 2 | Complete |
 | PROTO-03 | Phase 2 | Complete |
 | PROTO-04 | Phase 1 | Complete |
-| PROTO-05 | Phase 3 | Pending |
+| PROTO-05 | Phase 3 | Complete |
 | PROTO-06 | Phase 2 | Complete |
 | AUDIT-01 | Phase 5 | Pending |
 | AUDIT-02 | Phase 5 | Pending |
