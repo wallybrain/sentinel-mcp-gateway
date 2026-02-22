@@ -14,12 +14,12 @@
 | Field | Value |
 |-------|-------|
 | Phase | 01-foundation-config |
-| Plan | 01-02 (next) |
-| Status | Plan 01-01 complete, ready for 01-02 |
+| Plan | 01-02 (complete) |
+| Status | Phase 1 complete (2/2 plans), ready for Phase 2 |
 
 **Overall Progress:**
 ```
-Phase  1 [=] Foundation & Config (1/2 plans)
+Phase  1 [x] Foundation & Config (2/2 plans)
 Phase  2 [ ] MCP Protocol Layer
 Phase  3 [ ] HTTP Backend Routing
 Phase  4 [ ] Authentication & Authorization
@@ -35,10 +35,10 @@ Phase 10 [ ] Deployment & Integration
 
 | Metric | Value |
 |--------|-------|
-| Phases completed | 0/10 |
-| Plans completed | 1/? |
-| Requirements completed | 0/47 |
-| Session count | 1 |
+| Phases completed | 1/10 |
+| Plans completed | 2/? |
+| Requirements completed | 6/47 |
+| Session count | 2 |
 
 ## Accumulated Context
 
@@ -51,6 +51,8 @@ Phase 10 [ ] Deployment & Integration
 - rmcp 0.16 for protocol types only (not its server runtime)
 - Bounded channels everywhere (no unbounded from wrapper pattern)
 - JSON-RPC ID remapping from Phase 1 (architectural decision that cannot change later)
+- Own JSON-RPC types instead of using jsonrpc-core for max serde control
+- AtomicU64 counter starts at 1 (not 0) for gateway IDs -- avoids null-like zero values
 
 ### Known Gotchas
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -65,16 +67,16 @@ Phase 10 [ ] Deployment & Integration
 - None
 
 ### TODOs
-- Execute Phase 1 Plan 02 (JSON-RPC types + ID remapper)
+- Plan Phase 2 (MCP Protocol Layer)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 01-01-PLAN.md -- Cargo project scaffold with typed TOML config system and 8 integration tests
-- **Stopped at:** Completed 01-01-PLAN.md
-- **Next step:** Execute 01-02-PLAN.md (JSON-RPC 2.0 types and ID remapper)
+- **What happened:** Executed 01-02-PLAN.md -- JSON-RPC 2.0 types and ID remapper (TDD), 11 tests including concurrent collision test
+- **Stopped at:** Completed 01-02-PLAN.md (Phase 1 complete)
+- **Next step:** Plan Phase 2 (MCP Protocol Layer)
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22*
+*Last updated: 2026-02-22T02:15Z*

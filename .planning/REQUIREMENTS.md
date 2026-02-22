@@ -36,10 +36,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Protocol
 
-- [ ] **PROTO-01**: Gateway implements JSON-RPC 2.0 (request/response correlation, error objects, notifications)
+- [x] **PROTO-01**: Gateway implements JSON-RPC 2.0 (request/response correlation, error objects, notifications)
 - [ ] **PROTO-02**: Gateway handles MCP initialize handshake and responds with merged capabilities
 - [ ] **PROTO-03**: Gateway handles `tools/list` by aggregating schemas from all backends into one catalog
-- [ ] **PROTO-04**: Gateway remaps JSON-RPC request IDs to prevent collisions between backends
+- [x] **PROTO-04**: Gateway remaps JSON-RPC request IDs to prevent collisions between backends
 - [ ] **PROTO-05**: Gateway proxies SSE (text/event-stream) responses from backends without buffering
 - [ ] **PROTO-06**: Gateway accepts MCP requests via stdio transport (newline-delimited JSON-RPC on stdin/stdout)
 
@@ -155,10 +155,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STDIO-03 | Phase 8 | Pending |
 | STDIO-04 | Phase 8 | Pending |
 | STDIO-05 | Phase 8 | Pending |
-| PROTO-01 | Phase 1 | Pending |
+| PROTO-01 | Phase 1 | Complete |
 | PROTO-02 | Phase 2 | Pending |
 | PROTO-03 | Phase 2 | Pending |
-| PROTO-04 | Phase 1 | Pending |
+| PROTO-04 | Phase 1 | Complete |
 | PROTO-05 | Phase 3 | Pending |
 | PROTO-06 | Phase 2 | Pending |
 | AUDIT-01 | Phase 5 | Pending |
