@@ -18,8 +18,8 @@ Requirements for Deploy & Harden milestone. Each maps to roadmap phases.
 ### Cutover
 
 - [ ] **CUT-01**: ContextForge gateway process is stopped (containers preserved for rollback, not `docker compose down`)
-- [ ] **CUT-02**: Sentinel handles MCP traffic via stdio transport (native binary) and serves health/metrics on port 9201
-- [ ] **CUT-03**: Claude Code MCP config updated with new Sentinel entry and fresh JWT token
+- [x] **CUT-02**: Sentinel handles MCP traffic via stdio transport (native binary) and serves health/metrics on port 9201
+- [x] **CUT-03**: Claude Code MCP config updated with new Sentinel entry and fresh JWT token
 - [ ] **CUT-04**: All 7 backends respond to tool calls through Sentinel (n8n, sqlite, context7, firecrawl, exa, playwright, sequential-thinking)
 - [ ] **CUT-05**: Rollback procedure is documented and tested (restart ContextForge, revert MCP config)
 
@@ -87,8 +87,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PREP-04 | Phase 10 | Done |
 | PREP-05 | Phase 10 | Done |
 | CUT-01 | Phase 11 | Pending |
-| CUT-02 | Phase 11 | Pending |
-| CUT-03 | Phase 11 | Pending |
+| CUT-02 | Phase 11 | Complete |
+| CUT-03 | Phase 11 | Complete |
 | CUT-04 | Phase 11 | Pending |
 | CUT-05 | Phase 11 | Pending |
 | NET-01 | Phase 12 | Pending |
