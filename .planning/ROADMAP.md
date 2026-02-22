@@ -80,10 +80,10 @@ Plans:
   2. iptables DROP rules block ports 9200 and 9201 on eth0
   3. fix-iptables.sh includes Sentinel port rules and produces correct state when re-run
   4. Stale ContextForge Docker networks (mcpnet) are removed
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 12-01: TBD
+- [ ] 12-01-PLAN.md -- Verify port binding, add iptables DROP rules, update fix-iptables.sh, remove stale Docker network
 
 ### Phase 13: Monitoring Stack
 **Goal**: Sentinel metrics are visualized in Grafana and health failures trigger Discord alerts within minutes
@@ -132,10 +132,10 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14
 | 9. Observability & Hot Reload | v1.0 | 3/3 | Complete | 2026-02-22 |
 | 10. Pre-Cutover Preparation | v1.1 | 2/2 | Complete | 2026-02-22 |
 | 11. Cutover Execution | v1.1 | 2/2 | Complete | 2026-02-22 |
-| 12. Network Hardening | v1.1 | 0/TBD | Not started | - |
+| 12. Network Hardening | v1.1 | 0/1 | Not started | - |
 | 13. Monitoring Stack | v1.1 | 0/TBD | Not started | - |
 | 14. Operations | v1.1 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-22*
-*Last updated: 2026-02-22 after Phase 11 completion*
+*Last updated: 2026-02-22 after Phase 12 planning*
