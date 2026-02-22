@@ -1,96 +1,86 @@
 # MCP Topology
 
-How Claude Code connects to all MCP servers — governed and ungoverned.
+How Claude Code connects to MCP servers through Sentinel Gateway.
 
 ## Connection Overview
 
-Claude Code has two classes of MCP connections:
+All MCP traffic flows through a single governed chokepoint — Sentinel Gateway.
 
-### 1. Governed (via Sentinel Gateway)
+### Governed (via Sentinel Gateway)
 
 ```
 Claude Code
     |
     | stdio (JSON-RPC over stdin/stdout)
+    |
     v
-Docker wrapper container
-    |  --network=host
-    |  python3 -m mcpgateway.wrapper
+Sentinel Gateway (native Rust binary, ~14 MB)
+    |  JWT auth, rate limiting, circuit breakers, audit logging
     |
-    | HTTP POST to http://localhost:9200/servers/{virtual-server-id}/mcp
-    | Authorization: Bearer <JWT>
-    v
-ContextForge Gateway (port 9200)
+    +---> HTTP Backends
+    |     +---> mcp-n8n (127.0.0.1:3001, Docker sentinelnet)
+    |     |       +---> n8n:5678 (Docker n8n-mcp_default network)
+    |     |             7 workflows (6 active monitoring + 1 inactive)
+    |     |
+    |     +---> mcp-sqlite (127.0.0.1:3002, Docker sentinelnet)
+    |             +---> /home/lwb3/databases/*.db (volume mount)
     |
-    | Routes by tool name to registered backends
-    |
-    +---> mcp-n8n:3000 (Docker mcpnet network)
-    |       |
-    |       +---> n8n:5678 (Docker n8nnet network)
-    |             7 workflows (6 active monitoring + 1 inactive)
-    |
-    +---> mcp-sqlite:3000 (Docker mcpnet network)
-            |
-            +---> /home/lwb3/databases/*.db (volume mount)
+    +---> Managed stdio Backends (child processes)
+          +---> context7 (library documentation)
+          +---> firecrawl (web scraping)
+          +---> playwright (browser automation)
+          +---> sequential-thinking (chain-of-thought)
+          +---> ollama (local LLM, disabled)
 ```
 
 **Auth flow:**
-1. Claude Code starts Docker wrapper as stdio subprocess
-2. Wrapper reads JWT from env var `MCP_AUTH`
-3. Every request includes `Authorization: Bearer <token>` header
-4. Gateway validates JWT (HS256, checks exp/iss/aud/jti)
-5. Gateway checks RBAC permissions for requested tool
-6. Request forwarded to appropriate backend
+1. Claude Code spawns Sentinel binary as stdio subprocess
+2. Sentinel reads JWT from `SENTINEL_TOKEN` env var, validates at startup
+3. All tool calls are authenticated, rate-limited, and audit-logged
+4. HTTP backends reached via reqwest; stdio backends managed as child processes
+5. Circuit breakers isolate failing backends automatically
 
-### 2. Ungoverned (direct stdio)
+### Previously Ungoverned (now governed)
 
-These MCP servers are launched directly by Claude Code as child processes. No auth, no audit, no rate limiting.
+These servers were previously launched directly by Claude Code with no auth/audit. They are now managed by Sentinel as stdio child processes with full governance:
 
-| Server | Launch | Transport | Purpose |
-|--------|--------|-----------|---------|
-| `context7` | `npx @upstash/context7-mcp` | stdio | Library documentation |
-| `firecrawl` | `npx firecrawl-mcp` | stdio | Web scraping |
-| `sequential-thinking` | `npx @modelcontextprotocol/server-sequential-thinking` | stdio | Chain-of-thought |
-| `exa` | `npx exa-mcp` | stdio | Web search |
-| `playwright` | `npx @playwright/mcp` | stdio | Browser automation |
-
-**Risk:** These servers have unrestricted access. A compromised npx package could:
-- Exfiltrate data from tool call arguments
-- Execute arbitrary code on the host
-- Access the filesystem without constraints
+| Server | Status | Notes |
+|--------|--------|-------|
+| `context7` | Governed | Managed stdio backend |
+| `firecrawl` | Governed | Requires `FIRECRAWL_API_KEY` (inherited from `.env`) |
+| `playwright` | Governed | Headless Chromium, `--no-sandbox` |
+| `sequential-thinking` | Governed | Chain-of-thought reasoning |
+| `exa` | Disabled | Needs `EXA_API_KEY` (commented out in sentinel.toml) |
 
 ## Data Flow Examples
 
-### Governed: Claude Code -> n8n Workflow List
+### Claude Code -> n8n Workflow List
 
 ```
 1. Claude Code calls mcp__sentinel-gateway__list_workflows()
-2. Wrapper serializes JSON-RPC request to stdin
-3. Docker wrapper POSTs to http://localhost:9200/servers/7b99a944.../mcp
-4. Gateway validates JWT, checks RBAC, logs audit trail
-5. Gateway routes to mcp-n8n:3000 (backend registered for this tool)
-6. mcp-n8n queries n8n API: GET http://n8n:5678/api/v1/workflows
-7. Response flows back: n8n -> mcp-n8n -> gateway -> wrapper -> Claude Code
+2. Sentinel serializes JSON-RPC request
+3. Sentinel POSTs to http://127.0.0.1:3001 (mcp-n8n HTTP backend)
+4. Sentinel validates JWT, checks rate limits, logs audit trail
+5. mcp-n8n queries n8n API: GET http://n8n:5678/api/v1/workflows
+6. Response flows back: n8n -> mcp-n8n -> Sentinel -> Claude Code
 ```
 
-### Governed: Claude Code -> SQLite Query
+### Claude Code -> SQLite Query
 
 ```
 1. Claude Code calls mcp__sentinel-gateway__sqlite_query(sql="SELECT...")
-2. Same wrapper/gateway path as above
-3. Gateway routes to mcp-sqlite:3000
-4. mcp-sqlite uses better-sqlite3 to query /data/music.db
-5. Results flow back through the gateway
+2. Sentinel routes to http://127.0.0.1:3002 (mcp-sqlite HTTP backend)
+3. mcp-sqlite uses better-sqlite3 to query /data/*.db
+4. Results flow back through Sentinel
 ```
 
-### Ungoverned: Claude Code -> Context7
+### Claude Code -> Context7 (Managed stdio)
 
 ```
-1. Claude Code calls mcp__context7__resolve-library-id(...)
-2. Claude Code spawns npx @upstash/context7-mcp as child process
-3. Writes JSON-RPC to child's stdin
-4. Reads response from child's stdout
-5. No auth, no audit, no rate limiting
+1. Claude Code calls mcp__sentinel-gateway__resolve-library-id(...)
+2. Sentinel routes to context7 child process via stdin/stdout
+3. Auth, audit, rate limiting all applied by Sentinel
+4. Response flows back to Claude Code
 ```
 
 ## Docker Network Topology
@@ -104,25 +94,25 @@ These MCP servers are launched directly by Claude Code as child processes. No au
             |          |          |
          webproxy   webproxy   webproxy
             |          |          |
-       wallybrain   solitaire  authelia
+       wallybrain   solitaire  authelia    chiasm
        (:8800)      (:8801)    (:9091)
                        |
-                    n8nnet
+                 n8n-mcp_default
                        |
             +----------+----------+
             |          |          |
           n8n      mcp-n8n    monitoring
-         (:5678)   (:3000)   (9997-9999)
+         (:5678)   (:3001)   (9997-9999)
                        |
-                    mcpnet
+              sentinel-gateway_sentinelnet
                        |
-            +----------+----------+----------+
-            |          |          |          |
-         gateway   postgres    redis    mcp-sqlite
-         (:4444)   (:5432)    (:6379)   (:3000)
+            +----------+----------+
+            |          |          |
+      mcp-n8n    mcp-sqlite   sentinel-postgres
+      (:3001)    (:3002)      (:5432)
 ```
 
-**Key:** `mcp-n8n` bridges two networks (`mcpnet` + `n8nnet`) because n8n is bound to `127.0.0.1:8567` on the host — unreachable from other containers. The bridge container can reach both the gateway network and n8n's network.
+**Key:** `mcp-n8n` bridges two networks (`sentinelnet` + `n8n-mcp_default`) because n8n is bound to `127.0.0.1:8567` on the host — unreachable from other containers. The bridge container can reach both the Sentinel network and n8n's network.
 
 ## Monitoring Endpoints
 
@@ -144,24 +134,3 @@ These feed 6 active n8n workflows that send Discord alerts:
 | Container Health | Every 2 min | Any stopped/unhealthy |
 | Daily Health Heartbeat | 14:00 UTC | Always (summary embed) |
 | Security Reminders | 14:05 UTC | Monday/monthly/quarterly |
-
-## What the Rust Gateway Should Consolidate
-
-The target is to bring ALL MCP traffic through a single governed chokepoint:
-
-```
-BEFORE:                              AFTER:
-
-Claude Code                          Claude Code
-    |                                    |
-    +---> gateway (governed)             +---> Sentinel Gateway (Rust)
-    |       +---> n8n                    |       +---> n8n (HTTP backend)
-    |       +---> sqlite                 |       +---> sqlite (HTTP backend)
-    |                                    |       +---> context7 (managed stdio)
-    +---> context7 (ungoverned)          |       +---> firecrawl (managed stdio)
-    +---> firecrawl (ungoverned)         |       +---> exa (managed stdio)
-    +---> exa (ungoverned)               |       +---> sequential-thinking (managed)
-    +---> sequential-thinking            |       +---> playwright (managed)
-    +---> playwright (ungoverned)        |
-                                     Single auth, audit, rate limit for everything
-```

@@ -1,6 +1,11 @@
-# ContextForge Gateway Deployment
+# ContextForge Gateway Deployment (Legacy)
 
-IBM ContextForge (Python/FastAPI) deployment details — the system being replaced.
+> **Status: REPLACED** — IBM ContextForge was replaced by Sentinel Gateway on 2026-02-22.
+> Containers are stopped but preserved for rollback. This document is retained for reference.
+>
+> **Rollback:** `docker compose -f /home/lwb3/mcp-context-forge/docker-compose.yml start`
+
+IBM ContextForge (Python/FastAPI) deployment details — the system that was replaced by Sentinel Gateway.
 
 ## Deployment
 
@@ -74,90 +79,7 @@ Disabled in slim mode. CDN-like caching reverse proxy.
 | `developer` | Team | tools.read/execute, resources.read |
 | `viewer` | Team | tools.read, resources.read (read-only) |
 
-### Team Scoping
-
-```
-JWT 'teams' claim:
-  Missing        -> public-only (secure default)
-  null + is_admin -> admin bypass (current setup)
-  ["team-id"]    -> team + public resources
-```
-
-## Enabled Features
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Audit trail | Enabled | Every API request logged to Postgres |
-| Security logging | Enabled | All levels |
-| DB metrics recording | Enabled | Performance metrics to DB |
-| Permission audit | Enabled | RBAC decision logging |
-| Structured DB logging | Enabled | Queryable log records |
-| Admin UI | Enabled | Web interface |
-| Admin API | Enabled | REST management API |
-| Catalog | Enabled | MCP server catalog (1092-line YAML) |
-| Plugins | Enabled | 40+ available |
-
-## Tool Configuration
-
-| Setting | Value |
-|---------|-------|
-| Tool timeout | 60s |
-| Max retries | 3 |
-| Rate limit | 1000 req/s |
-| Concurrent limit | 50 |
-| Health check interval | 300s |
-| Unhealthy threshold | 3 failures |
-
-## Virtual Server
-
-**Combined Server ID:** `7b99a944e63845d6bb87b6d5fa3cdf87`
-
-This single virtual server routes to both backends, presenting a unified tool catalog of 19 tools.
-
-### n8n Backend (9 tools)
-
-| Tool | Purpose |
-|------|---------|
-| `list_workflows` | List all n8n workflows |
-| `get_workflow` | Get workflow details |
-| `create_workflow` | Create new workflow |
-| `update_workflow` | Update existing workflow |
-| `delete_workflow` | Delete workflow |
-| `activate_workflow` | Activate/deactivate |
-| `execute_workflow` | Run workflow manually |
-| `list_executions` | Execution history |
-| `get_execution` | Execution details |
-
-### SQLite Backend (10 tools)
-
-| Tool | Purpose |
-|------|---------|
-| `sqlite_query` | Run SELECT queries |
-| `sqlite_execute` | Run INSERT/UPDATE/DELETE/DDL |
-| `sqlite_tables` | List tables in database |
-| `sqlite_schema` | Get table schema |
-| `sqlite_describe` | Full database description |
-| `sqlite_create_table` | Create new table |
-| `sqlite_insert` | Insert rows |
-| `sqlite_backup` | Backup database |
-| `sqlite_analyze` | Analyze database |
-| `sqlite_databases` | List available databases |
-
-## Environment Variables (Key Names)
-
-Secrets live in `/home/lwb3/mcp-context-forge/.env` (never committed).
-
-| Variable | Purpose |
-|----------|---------|
-| `POSTGRES_PASSWORD` | Database auth |
-| `JWT_SECRET_KEY` | Token signing |
-| `AUTH_ENCRYPTION_SECRET` | Encryption key |
-| `PLATFORM_ADMIN_PASSWORD` | Admin account |
-| `PLATFORM_ADMIN_EMAIL` | Admin identity |
-| `LOG_LEVEL` | Gateway logging |
-| `AUDIT_TRAIL_ENABLED` | Audit on/off |
-
-## What We Actually Use vs What's Available
+## What We Actually Used vs What Was Available
 
 ### Used
 
@@ -181,12 +103,6 @@ Secrets live in `/home/lwb3/mcp-context-forge/.env` (never committed).
 - Model/provider proxying
 - Canary/blue-green deployments
 
-## Health Check
+## Why It Was Replaced
 
-```python
-# Gateway health endpoint
-GET http://127.0.0.1:9200/health
-# Returns: {"status": "healthy", ...}
-
-# Docker healthcheck runs every 30s with 10s timeout
-```
+ContextForge used **5 containers (~1 GB RAM, ~330 MB disk)** for what amounted to routing requests to 2 backends with a token check. Sentinel Gateway replaces this with a single ~14 MB Rust binary using <50 MB RAM, while also governing the 5 previously-ungoverned stdio MCP servers.
