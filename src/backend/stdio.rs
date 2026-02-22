@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
@@ -9,6 +9,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 use super::error::BackendError;
 use crate::config::types::BackendConfig;
@@ -306,6 +307,148 @@ pub fn drain_pending(pending: &Arc<Mutex<HashMap<u64, oneshot::Sender<String>>>>
     }
 }
 
+pub async fn run_supervisor(
+    config: BackendConfig,
+    cancel: CancellationToken,
+    on_tools_discovered: mpsc::Sender<(String, Vec<rmcp::model::Tool>, StdioBackend)>,
+) {
+    const BACKOFF_BASE_SECS: f64 = 1.0;
+    const BACKOFF_MAX_SECS: f64 = 60.0;
+    const HEALTHY_THRESHOLD: Duration = Duration::from_secs(60);
+
+    let mut restart_count: u32 = 0;
+
+    loop {
+        if cancel.is_cancelled() {
+            tracing::info!(backend = %config.name, "supervisor stopping (cancelled before spawn)");
+            break;
+        }
+
+        let spawn_result = StdioBackend::spawn(&config);
+        let (backend, _stdin_handle, stdout_handle) = match spawn_result {
+            Ok(result) => result,
+            Err(e) => {
+                tracing::error!(backend = %config.name, error = %e, "failed to spawn child process");
+                restart_count += 1;
+                if config.max_restarts > 0 && restart_count >= config.max_restarts {
+                    tracing::error!(
+                        backend = %config.name,
+                        restarts = restart_count,
+                        max = config.max_restarts,
+                        "max restarts reached, supervisor stopping"
+                    );
+                    break;
+                }
+                let delay = backoff_delay(restart_count, BACKOFF_BASE_SECS, BACKOFF_MAX_SECS);
+                tokio::select! {
+                    _ = tokio::time::sleep(delay) => continue,
+                    _ = cancel.cancelled() => {
+                        tracing::info!(backend = %config.name, "supervisor stopping during backoff");
+                        break;
+                    }
+                }
+            }
+        };
+
+        let pid = backend.pid();
+        let spawn_time = Instant::now();
+
+        // Perform MCP handshake
+        match discover_stdio_tools(&backend).await {
+            Ok(tools) => {
+                if let Err(_) = on_tools_discovered
+                    .send((config.name.clone(), tools, backend.clone()))
+                    .await
+                {
+                    tracing::warn!(backend = %config.name, "tools channel closed, supervisor stopping");
+                    kill_process_group(pid);
+                    break;
+                }
+            }
+            Err(e) => {
+                tracing::error!(backend = %config.name, error = %e, "MCP handshake failed after spawn");
+                kill_process_group(pid);
+                restart_count += 1;
+                if config.max_restarts > 0 && restart_count >= config.max_restarts {
+                    tracing::error!(
+                        backend = %config.name,
+                        restarts = restart_count,
+                        max = config.max_restarts,
+                        "max restarts reached, supervisor stopping"
+                    );
+                    break;
+                }
+                let delay = backoff_delay(restart_count, BACKOFF_BASE_SECS, BACKOFF_MAX_SECS);
+                tokio::select! {
+                    _ = tokio::time::sleep(delay) => continue,
+                    _ = cancel.cancelled() => {
+                        tracing::info!(backend = %config.name, "supervisor stopping during backoff");
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Monitor for child exit or cancellation
+        tokio::select! {
+            _ = stdout_handle => {
+                // stdout_reader completed = child exited (EOF)
+                tracing::warn!(backend = %config.name, pid = pid, "child process exited (stdout EOF)");
+                drain_pending(&backend.pending);
+                kill_process_group(pid);
+
+                // Reset restart count if process was healthy for a while
+                if spawn_time.elapsed() > HEALTHY_THRESHOLD {
+                    restart_count = 0;
+                }
+
+                restart_count += 1;
+                if config.max_restarts > 0 && restart_count >= config.max_restarts {
+                    tracing::error!(
+                        backend = %config.name,
+                        restarts = restart_count,
+                        max = config.max_restarts,
+                        "max restarts reached, supervisor stopping"
+                    );
+                    break;
+                }
+
+                let delay = backoff_delay(restart_count, BACKOFF_BASE_SECS, BACKOFF_MAX_SECS);
+                tracing::info!(
+                    backend = %config.name,
+                    restart = restart_count,
+                    delay_ms = delay.as_millis() as u64,
+                    "restarting after backoff"
+                );
+                tokio::select! {
+                    _ = tokio::time::sleep(delay) => {}
+                    _ = cancel.cancelled() => {
+                        tracing::info!(backend = %config.name, "supervisor stopping during backoff");
+                        break;
+                    }
+                }
+            }
+            _ = cancel.cancelled() => {
+                tracing::info!(backend = %config.name, "supervisor shutting down");
+                kill_process_group(pid);
+                // Give child a moment to exit
+                let _ = tokio::time::timeout(Duration::from_secs(2), async {
+                    // stdin_handle and stdout_handle will complete when pipes close
+                    loop { tokio::time::sleep(Duration::from_millis(50)).await; }
+                }).await;
+                break;
+            }
+        }
+    }
+}
+
+fn backoff_delay(restart_count: u32, base_secs: f64, max_secs: f64) -> Duration {
+    let exp = base_secs * 2.0_f64.powi(restart_count.saturating_sub(1) as i32);
+    let capped = exp.min(max_secs);
+    let jitter = rand::random::<f64>() * 0.5 * capped;
+    Duration::from_secs_f64(capped + jitter)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -396,5 +539,92 @@ mod tests {
         // Wait for tasks to finish
         let _ = tokio::time::timeout(Duration::from_secs(2), stdin_handle).await;
         let _ = tokio::time::timeout(Duration::from_secs(2), stdout_handle).await;
+    }
+
+    fn test_config(command: &str, args: Vec<&str>, max_restarts: u32) -> BackendConfig {
+        BackendConfig {
+            name: "test-supervisor".to_string(),
+            backend_type: crate::config::types::BackendType::Stdio,
+            url: None,
+            command: Some(command.to_string()),
+            args: args.into_iter().map(String::from).collect(),
+            env: HashMap::new(),
+            timeout_secs: 5,
+            retries: 0,
+            restart_on_exit: true,
+            max_restarts,
+            health_interval_secs: 300,
+            circuit_breaker_threshold: 5,
+            circuit_breaker_recovery_secs: 30,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_supervisor_detects_child_exit_and_restarts() {
+        // "true" exits immediately with code 0 -- supervisor should detect and restart
+        let config = test_config("true", vec![], 3);
+        let cancel = CancellationToken::new();
+        let (tools_tx, mut tools_rx) = mpsc::channel(10);
+
+        let cancel_clone = cancel.clone();
+        let handle = tokio::spawn(async move {
+            run_supervisor(config, cancel_clone, tools_tx).await;
+        });
+
+        // Supervisor will spawn "true" which exits immediately.
+        // MCP handshake will fail (true produces no output), so it goes to restart.
+        // After max_restarts=3, supervisor should stop on its own.
+        let result = tokio::time::timeout(Duration::from_secs(30), handle).await;
+        assert!(result.is_ok(), "supervisor should have stopped after max_restarts");
+
+        // No tools should have been discovered (true doesn't speak MCP)
+        assert!(tools_rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn test_supervisor_respects_cancellation_during_backoff() {
+        // "true" exits immediately -- supervisor will enter backoff
+        let config = test_config("true", vec![], 10); // high limit so it doesn't stop on its own
+        let cancel = CancellationToken::new();
+        let (tools_tx, _tools_rx) = mpsc::channel(10);
+
+        let cancel_clone = cancel.clone();
+        let handle = tokio::spawn(async move {
+            run_supervisor(config, cancel_clone, tools_tx).await;
+        });
+
+        // Give supervisor time to spawn, fail handshake, enter backoff
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        let start = Instant::now();
+        cancel.cancel();
+
+        let result = tokio::time::timeout(Duration::from_secs(2), handle).await;
+        assert!(result.is_ok(), "supervisor should exit promptly on cancel");
+        assert!(
+            start.elapsed() < Duration::from_secs(2),
+            "supervisor should exit within 2s of cancel, took {:?}",
+            start.elapsed()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_supervisor_stops_after_max_restarts() {
+        let config = test_config("true", vec![], 2);
+        let cancel = CancellationToken::new();
+        let (tools_tx, _tools_rx) = mpsc::channel(10);
+
+        let cancel_clone = cancel.clone();
+        let start = Instant::now();
+        let handle = tokio::spawn(async move {
+            run_supervisor(config, cancel_clone, tools_tx).await;
+        });
+
+        let result = tokio::time::timeout(Duration::from_secs(30), handle).await;
+        assert!(result.is_ok(), "supervisor should stop after max_restarts=2");
+
+        // Verify it didn't exit because of cancellation
+        assert!(!cancel.is_cancelled(), "cancel should not have been triggered");
+        tracing::info!(elapsed_ms = start.elapsed().as_millis() as u64, "supervisor stopped after max_restarts");
     }
 }
