@@ -16,6 +16,7 @@ thiserror = "2"
 anyhow = "1"
 mimalloc = { version = "0.1", default-features = false }
 dotenvy = "0.15"
+rmcp = { version = "=0.16.0", default-features = false, features = ["server"] }
 
 [dev-dependencies]
 tokio-test = "0.4"
