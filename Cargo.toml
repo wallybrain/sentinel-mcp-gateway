@@ -17,6 +17,10 @@ anyhow = "1"
 mimalloc = { version = "0.1", default-features = false }
 dotenvy = "0.15"
 rmcp = { version = "=0.16.0", default-features = false, features = ["server"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+bytes = "1"
+futures = "0.3"
+rand = "0.9"
 
 [dev-dependencies]
 tokio-test = "0.4"
