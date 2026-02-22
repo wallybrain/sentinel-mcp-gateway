@@ -3,6 +3,20 @@ services:
     image: postgres:16-alpine
     container_name: sentinel-postgres
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/postgresql
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
     environment:
       - POSTGRES_USER=sentinel
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -19,6 +33,11 @@ services:
       start_period: 10s
     networks:
       - sentinelnet
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          pids: 100
 
   mcp-n8n:
     build:
@@ -26,6 +45,13 @@ services:
       dockerfile: /home/lwb3/sentinel-gateway/sidecars/Dockerfile.n8n
     container_name: mcp-n8n
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       - MCP_TRANSPORT=http
       - MCP_PORT=3000
@@ -46,6 +72,7 @@ services:
       resources:
         limits:
           memory: 128M
+          pids: 100
     logging:
       driver: json-file
       options:
@@ -58,6 +85,13 @@ services:
       dockerfile: /home/lwb3/sentinel-gateway/sidecars/Dockerfile.mcp-sqlite
     container_name: mcp-sqlite
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       - MCP_TRANSPORT=http
       - MCP_PORT=3000
@@ -78,6 +112,7 @@ services:
       resources:
         limits:
           memory: 128M
+          pids: 100
     logging:
       driver: json-file
       options:
@@ -87,6 +122,7 @@ services:
 networks:
   sentinelnet:
     driver: bridge
+    internal: true
   n8nnet:
     external: true
     name: n8n-mcp_default
