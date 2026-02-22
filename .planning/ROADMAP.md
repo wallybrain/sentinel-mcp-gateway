@@ -43,7 +43,10 @@ Plans:
   1. The gateway responds to an MCP `initialize` request with a valid capabilities response (protocol version 2025-03-26)
   2. The gateway reads newline-delimited JSON-RPC from stdin and writes responses to stdout (stdio transport)
   3. The gateway aggregates `tools/list` from stub/mock backends into a single unified catalog
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 02-01-PLAN.md -- rmcp dependency, stdio transport, and MCP lifecycle state machine
+- [ ] 02-02-PLAN.md -- Tool catalog aggregation, dispatch loop, and end-to-end integration tests
 
 ### Phase 3: HTTP Backend Routing
 **Goal**: Tool calls route to real HTTP backends (n8n, sqlite) with reliable connection handling and streaming support
@@ -143,7 +146,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Config | 2/2 | Complete | 2026-02-22 |
-| 2. MCP Protocol Layer | 0/? | Not started | - |
+| 2. MCP Protocol Layer | 0/2 | Planning complete | - |
 | 3. HTTP Backend Routing | 0/? | Not started | - |
 | 4. Authentication & Authorization | 0/? | Not started | - |
 | 5. Audit Logging | 0/? | Not started | - |
@@ -155,4 +158,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-02-22*
-*Last updated: 2026-02-22T02:15Z*
+*Last updated: 2026-02-22*
