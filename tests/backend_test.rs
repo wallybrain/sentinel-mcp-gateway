@@ -80,6 +80,8 @@ fn make_config(url: &str) -> BackendConfig {
         restart_on_exit: false,
         max_restarts: 5,
         health_interval_secs: 300,
+        circuit_breaker_threshold: 5,
+        circuit_breaker_recovery_secs: 30,
     }
 }
 

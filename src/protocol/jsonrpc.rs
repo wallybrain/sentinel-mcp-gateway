@@ -9,6 +9,7 @@ pub const INVALID_PARAMS: i32 = -32602;
 pub const INTERNAL_ERROR: i32 = -32603;
 pub const RATE_LIMIT_ERROR: i32 = -32004;
 pub const KILL_SWITCH_ERROR: i32 = -32005;
+pub const CIRCUIT_OPEN_ERROR: i32 = -32007;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(untagged)]
