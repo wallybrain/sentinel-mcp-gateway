@@ -11,12 +11,15 @@ use sentinel_gateway::audit;
 use sentinel_gateway::auth::jwt::{CallerIdentity, JwtValidator};
 use sentinel_gateway::backend::{build_http_client, discover_tools, Backend, HttpBackend, StdioBackend};
 use sentinel_gateway::backend::stdio::run_supervisor;
+use sentinel_gateway::config::hot::HotConfig;
 use sentinel_gateway::config::types::BackendType;
 use sentinel_gateway::health::checker::health_checker;
 use sentinel_gateway::health::circuit_breaker::CircuitBreaker;
 use sentinel_gateway::health::server::{run_health_server, BackendHealth, BackendHealthMap};
+use sentinel_gateway::metrics::Metrics;
 use sentinel_gateway::protocol::id_remapper::IdRemapper;
 use sentinel_gateway::ratelimit::RateLimiter;
+use sentinel_gateway::validation::SchemaCache;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -207,7 +210,17 @@ async fn main() -> anyhow::Result<()> {
         (None, None)
     };
 
-    let rate_limiter = RateLimiter::new(&config.rate_limits);
+    // Create Metrics
+    let metrics = Arc::new(Metrics::new());
+
+    // Create SchemaCache from catalog
+    let schema_cache = SchemaCache::from_catalog(&catalog);
+
+    // Create SharedHotConfig (replaces standalone rate_limiter and kill_switch)
+    let hot_config = HotConfig::new(
+        config.kill_switch,
+        RateLimiter::new(&config.rate_limits),
+    ).shared();
 
     // Initialize shared health state (optimistic start: all discovered backends healthy)
     let health_map: BackendHealthMap = Arc::new(RwLock::new(HashMap::new()));
@@ -222,6 +235,8 @@ async fn main() -> anyhow::Result<()> {
                     consecutive_failures: 0,
                 },
             );
+            // Set initial backend health in metrics
+            metrics.set_backend_health(name, true);
         }
     }
 
@@ -241,7 +256,7 @@ async fn main() -> anyhow::Result<()> {
         })
         .collect();
 
-    // Spawn signal handler
+    // Spawn signal handler (SIGTERM/SIGINT -> cancel)
     let cancel_signal = cancel.clone();
     tokio::spawn(async move {
         let mut sigterm = signal(SignalKind::terminate()).expect("SIGTERM handler");
@@ -253,17 +268,38 @@ async fn main() -> anyhow::Result<()> {
         cancel_signal.cancel();
     });
 
-    // Spawn health HTTP server
+    // Spawn SIGHUP handler for hot config reload
+    let config_path_reload = cli.config.clone();
+    let hot_config_reload = hot_config.clone();
+    tokio::spawn(async move {
+        let mut sighup = signal(SignalKind::hangup()).expect("SIGHUP handler");
+        loop {
+            sighup.recv().await;
+            tracing::info!("SIGHUP received, reloading config");
+            match sentinel_gateway::config::hot::reload_hot_config(&config_path_reload) {
+                Ok(new_hot) => {
+                    *hot_config_reload.write().await = new_hot;
+                    tracing::info!("Config reloaded successfully (kill_switch + rate_limits)");
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "Config reload failed, keeping previous config");
+                }
+            }
+        }
+    });
+
+    // Spawn health HTTP server (with metrics)
     let health_addr = config.gateway.health_listen.clone();
     let health_map_server = health_map.clone();
+    let metrics_server = metrics.clone();
     let cancel_server = cancel.clone();
     tokio::spawn(async move {
-        if let Err(e) = run_health_server(&health_addr, health_map_server, None, cancel_server).await {
+        if let Err(e) = run_health_server(&health_addr, health_map_server, Some(metrics_server), cancel_server).await {
             tracing::error!(error = %e, "Health server exited with error");
         }
     });
 
-    // Spawn health checker
+    // Spawn health checker (with metrics)
     let backends_list: Vec<(String, HttpBackend)> = backends_map
         .iter()
         .filter_map(|(name, backend)| match backend {
@@ -271,9 +307,11 @@ async fn main() -> anyhow::Result<()> {
             _ => None,
         })
         .collect();
+    let metrics_checker = metrics.clone();
     tokio::spawn(health_checker(
         backends_list,
         health_map.clone(),
+        Some(metrics_checker),
         cancel.clone(),
         30,
     ));
@@ -294,8 +332,9 @@ async fn main() -> anyhow::Result<()> {
         caller,
         &config.rbac,
         dispatch_audit_tx,
-        &rate_limiter,
-        &config.kill_switch,
+        hot_config.clone(),
+        Some(metrics.clone()),
+        &schema_cache,
         &circuit_breakers,
         cancel.clone(),
     )

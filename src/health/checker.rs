@@ -1,14 +1,17 @@
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use tokio_util::sync::CancellationToken;
 
 use crate::backend::HttpBackend;
+use crate::metrics::Metrics;
 
 use super::server::{BackendHealth, BackendHealthMap};
 
 pub async fn health_checker(
     backends: Vec<(String, HttpBackend)>,
     health_map: BackendHealthMap,
+    metrics: Option<Arc<Metrics>>,
     cancel: CancellationToken,
     interval_secs: u64,
 ) {
@@ -31,12 +34,18 @@ pub async fn health_checker(
                             entry.healthy = true;
                             entry.consecutive_failures = 0;
                             entry.last_check = Instant::now();
+                            if let Some(ref m) = metrics {
+                                m.set_backend_health(name, true);
+                            }
                             tracing::debug!(backend = %name, "Health check passed");
                         }
                         Err(e) => {
                             entry.healthy = false;
                             entry.consecutive_failures += 1;
                             entry.last_check = Instant::now();
+                            if let Some(ref m) = metrics {
+                                m.set_backend_health(name, false);
+                            }
                             tracing::warn!(
                                 backend = %name,
                                 failures = entry.consecutive_failures,
