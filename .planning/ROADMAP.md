@@ -13,7 +13,7 @@
 - [x] **Phase 4: Authentication & Authorization** - JWT validation and per-tool per-role RBAC on every request
 - [x] **Phase 5: Audit Logging** - Structured audit trail to Postgres with async writes and auto-migrations
 - [x] **Phase 6: Rate Limiting & Kill Switch** - Per-client per-tool token bucket and per-tool/backend disable switches
-- [ ] **Phase 7: Health & Reliability** - Health endpoints, backend pinging, circuit breaker, and graceful shutdown
+- [x] **Phase 7: Health & Reliability** - Health endpoints, backend pinging, circuit breaker, and graceful shutdown
 - [ ] **Phase 8: stdio Backend Management** - Spawn, supervise, and multiplex JSON-RPC over stdio child processes
 - [ ] **Phase 9: Observability & Hot Reload** - Prometheus metrics, schema validation, and zero-downtime config reload
 - [ ] **Phase 10: Deployment & Integration** - Docker image, Compose stack, and production cutover from ContextForge
@@ -119,7 +119,7 @@ Plans:
 **Plans:** 2 plans
 Plans:
 - [x] 07-01-PLAN.md -- Health module with axum server, background checker, and circuit breaker
-- [ ] 07-02-PLAN.md -- Wire health, circuit breaker, and graceful shutdown into dispatch loop and main.rs
+- [x] 07-02-PLAN.md -- Wire health, circuit breaker, and graceful shutdown into dispatch loop and main.rs
 
 ### Phase 8: stdio Backend Management
 **Goal**: The gateway governs stdio-based MCP servers (context7, firecrawl, exa, playwright, sequential-thinking) -- the unique differentiator
@@ -166,7 +166,7 @@ Plans:
 | 4. Authentication & Authorization | 2/2 | Complete    | 2026-02-22 |
 | 5. Audit Logging | 2/2 | Complete    | 2026-02-22 |
 | 6. Rate Limiting & Kill Switch | 2/2 | Complete    | 2026-02-22 |
-| 7. Health & Reliability | 1/2 | In progress | - |
+| 7. Health & Reliability | 2/2 | Complete | 2026-02-22 |
 | 8. stdio Backend Management | 0/? | Not started | - |
 | 9. Observability & Hot Reload | 0/? | Not started | - |
 | 10. Deployment & Integration | 0/? | Not started | - |

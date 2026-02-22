@@ -67,7 +67,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **HEALTH-02**: Gateway exposes `/ready` endpoint (readiness — at least one backend is reachable)
 - [x] **HEALTH-03**: Gateway periodically pings backends and tracks their health status
 - [x] **HEALTH-04**: Gateway implements circuit breaker per backend (open after N failures, half-open probe, close on success)
-- [ ] **HEALTH-05**: Gateway shuts down gracefully on SIGTERM (drain in-flight requests, terminate stdio children, flush audit logs)
+- [x] **HEALTH-05**: Gateway shuts down gracefully on SIGTERM (drain in-flight requests, terminate stdio children, flush audit logs)
 
 ### Configuration
 
@@ -174,7 +174,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HEALTH-02 | Phase 7 | Complete |
 | HEALTH-03 | Phase 7 | Complete |
 | HEALTH-04 | Phase 7 | Complete |
-| HEALTH-05 | Phase 7 | Pending |
+| HEALTH-05 | Phase 7 | Complete |
 | CONFIG-01 | Phase 1 | Complete |
 | CONFIG-02 | Phase 1 | Complete |
 | CONFIG-03 | Phase 9 | Pending |

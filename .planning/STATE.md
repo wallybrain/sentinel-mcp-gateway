@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 7 in progress -- health module built, wiring into dispatch next |
+| Current Focus | Phase 7 complete -- health, circuit breakers, graceful shutdown wired in |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -13,9 +13,9 @@
 
 | Field | Value |
 |-------|-------|
-| Phase | 07-health-reliability |
-| Plan | 02 |
-| Status | Phase 7 in progress (1/2 plans) |
+| Phase | 08-stdio-backend |
+| Plan | 01 |
+| Status | Phase 7 complete (2/2 plans), Phase 8 next |
 
 **Overall Progress:**
 ```
@@ -25,7 +25,7 @@ Phase  3 [x] HTTP Backend Routing (2/2 plans)
 Phase  4 [x] Authentication & Authorization (2/2 plans)
 Phase  5 [x] Audit Logging (2/2 plans)
 Phase  6 [x] Rate Limiting & Kill Switch (2/2 plans)
-Phase  7 [~] Health & Reliability (1/2 plans)
+Phase  7 [x] Health & Reliability (2/2 plans)
 Phase  8 [ ] stdio Backend Management
 Phase  9 [ ] Observability & Hot Reload
 Phase 10 [ ] Deployment & Integration
@@ -35,9 +35,9 @@ Phase 10 [ ] Deployment & Integration
 
 | Metric | Value |
 |--------|-------|
-| Phases completed | 6/10 |
-| Plans completed | 13/? |
-| Requirements completed | 31/47 |
+| Phases completed | 7/10 |
+| Plans completed | 14/? |
+| Requirements completed | 36/47 |
 | Session count | 7 |
 
 | Phase | Plan | Duration | Tasks | Files |
@@ -53,6 +53,7 @@ Phase 10 [ ] Deployment & Integration
 | 06 | 01 | 3min | 2 | 3 |
 | 06 | 02 | 4min | 2 | 3 |
 | 07 | 01 | 6min | 2 | 10 |
+| 07 | 02 | 17min | 2 | 6 |
 
 ## Accumulated Context
 
@@ -87,12 +88,15 @@ Phase 10 [ ] Deployment & Integration
 - CallerIdentity passed to run_dispatch (not JwtValidator) for testability and separation of concerns
 - JWT validation in main.rs, RBAC enforcement in gateway.rs
 - AUTHZ_ERROR is -32003 (distinct from -32001 auth and -32002 not-initialized)
-- Enforcement order: kill switch -> rate limit -> RBAC -> backend call
+- Enforcement order: kill switch -> rate limit -> RBAC -> circuit breaker -> backend call
 - Kill switch filters both tools/list and tools/call for consistency
 - All rejection types (killed, rate_limited) emit audit entries with latency_ms=0
 - Axum 0.8 for health HTTP server (separate from main MCP transport)
 - AtomicU8 + AtomicU32 + Mutex<Option<Instant>> for lock-free circuit breaker state
 - tower dev-dependency for Router::oneshot() in unit tests
+- Clone audit_tx for dispatch, keep original for ordered shutdown drop
+- Extract build_health_router() from run_health_server for test reuse
+- HttpBackend derives Clone (reqwest::Client is Clone)
 
 ### Known Gotchas
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -108,16 +112,16 @@ Phase 10 [ ] Deployment & Integration
 - None
 
 ### TODOs
-- Execute Phase 7 Plan 02 (wire health into dispatch and main.rs)
+- Plan and execute Phase 8 (stdio backend management)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 07-01-PLAN.md -- built health module with axum server, background checker, circuit breaker, 14 new tests
-- **Stopped at:** Completed 07-01-PLAN.md (Phase 7 in progress, 1/2 plans)
-- **Next step:** Execute 07-02-PLAN.md (wire health, circuit breaker, graceful shutdown into dispatch loop)
+- **What happened:** Executed 07-02-PLAN.md -- wired health server, circuit breakers, and graceful shutdown into main.rs and gateway.rs, 5 new integration tests, 120 total tests passing
+- **Stopped at:** Completed 07-02-PLAN.md (Phase 7 complete, 2/2 plans)
+- **Next step:** Plan and execute Phase 8 (stdio backend management)
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22T05:20Z*
+*Last updated: 2026-02-22T06:06Z*
