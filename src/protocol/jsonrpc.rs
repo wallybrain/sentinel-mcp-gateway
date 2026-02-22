@@ -30,7 +30,7 @@ impl JsonRpcRequest {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonRpcResponse {
     pub jsonrpc: String,
     pub id: JsonRpcId,

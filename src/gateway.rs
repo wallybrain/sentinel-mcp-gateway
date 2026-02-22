@@ -1,10 +1,15 @@
+use std::collections::HashMap;
+
 use rmcp::model::ListToolsResult;
 use serde_json::json;
 use tokio::sync::mpsc;
 
+use crate::backend::HttpBackend;
 use crate::catalog::ToolCatalog;
+use crate::protocol::id_remapper::IdRemapper;
 use crate::protocol::jsonrpc::{
-    JsonRpcId, JsonRpcRequest, JsonRpcResponse, METHOD_NOT_FOUND, PARSE_ERROR,
+    JsonRpcId, JsonRpcRequest, JsonRpcResponse, INTERNAL_ERROR, INVALID_PARAMS, METHOD_NOT_FOUND,
+    PARSE_ERROR,
 };
 use crate::protocol::mcp::{handle_initialize, McpState};
 
@@ -19,6 +24,8 @@ pub async fn run_dispatch(
     mut rx: mpsc::Receiver<String>,
     tx: mpsc::Sender<String>,
     catalog: &ToolCatalog,
+    backends: &HashMap<String, HttpBackend>,
+    id_remapper: &IdRemapper,
 ) -> anyhow::Result<()> {
     let mut state = McpState::Created;
 
@@ -88,6 +95,16 @@ pub async fn run_dispatch(
                 }
             }
 
+            "tools/call" => {
+                if !is_notification {
+                    let id = request.id.clone().unwrap_or(JsonRpcId::Null);
+                    let resp =
+                        handle_tools_call(id, request.params, catalog, backends, id_remapper)
+                            .await;
+                    send_response(&tx, &resp).await;
+                }
+            }
+
             "ping" => {
                 if !is_notification {
                     let id = request.id.clone().unwrap_or(JsonRpcId::Null);
@@ -114,6 +131,112 @@ pub async fn run_dispatch(
     tracing::info!("MCP state -> Closed (input channel closed)");
     let _ = state; // suppress unused warning
     Ok(())
+}
+
+async fn handle_tools_call(
+    client_id: JsonRpcId,
+    params: Option<serde_json::Value>,
+    catalog: &ToolCatalog,
+    backends: &HashMap<String, HttpBackend>,
+    id_remapper: &IdRemapper,
+) -> JsonRpcResponse {
+    // Extract tool name from params
+    let tool_name = match params
+        .as_ref()
+        .and_then(|p| p.get("name"))
+        .and_then(|n| n.as_str())
+    {
+        Some(name) => name.to_string(),
+        None => {
+            return JsonRpcResponse::error(
+                client_id,
+                INVALID_PARAMS,
+                "Missing tool name in params".to_string(),
+            );
+        }
+    };
+
+    // Route via catalog
+    let backend_name = match catalog.route(&tool_name) {
+        Some(name) => name.to_string(),
+        None => {
+            return JsonRpcResponse::error(
+                client_id,
+                INVALID_PARAMS,
+                format!("Unknown tool: {tool_name}"),
+            );
+        }
+    };
+
+    // Get backend
+    let backend = match backends.get(&backend_name) {
+        Some(b) => b,
+        None => {
+            tracing::error!(
+                backend = %backend_name,
+                tool = %tool_name,
+                "Backend in catalog but not in backends map"
+            );
+            return JsonRpcResponse::error(
+                client_id,
+                INTERNAL_ERROR,
+                format!("Backend unavailable: {backend_name}"),
+            );
+        }
+    };
+
+    // Remap ID
+    let gateway_id = id_remapper.remap(client_id, &backend_name);
+
+    // Build outbound request
+    let outbound = json!({
+        "jsonrpc": "2.0",
+        "id": gateway_id,
+        "method": "tools/call",
+        "params": params,
+    });
+    let body = serde_json::to_string(&outbound).expect("JSON serialization cannot fail");
+
+    // Send to backend
+    match backend.send(&body).await {
+        Ok(response_str) => {
+            // Parse response and restore original ID
+            match serde_json::from_str::<JsonRpcResponse>(&response_str) {
+                Ok(mut backend_resp) => {
+                    if let Some((original_id, _)) = id_remapper.restore(gateway_id) {
+                        backend_resp.id = original_id;
+                    }
+                    backend_resp
+                }
+                Err(e) => {
+                    // Restore ID even on parse failure
+                    let original = id_remapper
+                        .restore(gateway_id)
+                        .map(|(id, _)| id)
+                        .unwrap_or(JsonRpcId::Null);
+                    tracing::error!(error = %e, "Failed to parse backend response");
+                    JsonRpcResponse::error(
+                        original,
+                        INTERNAL_ERROR,
+                        format!("Invalid backend response: {e}"),
+                    )
+                }
+            }
+        }
+        Err(e) => {
+            // Restore ID on error
+            let original = id_remapper
+                .restore(gateway_id)
+                .map(|(id, _)| id)
+                .unwrap_or(JsonRpcId::Null);
+            tracing::error!(error = %e, backend = %backend_name, "Backend call failed");
+            JsonRpcResponse::error(
+                original,
+                INTERNAL_ERROR,
+                format!("Backend error: {e}"),
+            )
+        }
+    }
 }
 
 async fn send_response(tx: &mpsc::Sender<String>, resp: &JsonRpcResponse) {

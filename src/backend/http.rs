@@ -3,6 +3,8 @@ use std::time::Duration;
 use bytes::BytesMut;
 use futures::StreamExt;
 use reqwest::Client;
+use rmcp::model::Tool;
+use serde_json::json;
 
 use crate::config::types::BackendConfig;
 
@@ -117,4 +119,64 @@ impl HttpBackend {
         let raw = String::from_utf8_lossy(&buf);
         parse_sse_data(&raw).ok_or(BackendError::NoDataInSse)
     }
+}
+
+/// Discover tools from an HTTP MCP backend by performing the MCP handshake.
+///
+/// Sends initialize -> notifications/initialized -> tools/list, then
+/// extracts and returns the tool definitions.
+pub async fn discover_tools(backend: &HttpBackend) -> anyhow::Result<Vec<Tool>> {
+    // Step 1: Send initialize request
+    let init_req = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-03-26",
+            "capabilities": {},
+            "clientInfo": {
+                "name": "sentinel-gateway",
+                "version": "0.1.0"
+            }
+        }
+    });
+    let init_body = serde_json::to_string(&init_req)?;
+    let init_response = backend.send(&init_body).await?;
+    tracing::debug!(url = %backend.url(), response = %init_response, "MCP initialize response");
+
+    // Step 2: Send notifications/initialized (fire and forget)
+    let initialized_notif = json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+    });
+    let notif_body = serde_json::to_string(&initialized_notif)?;
+    if let Err(e) = backend.send(&notif_body).await {
+        tracing::debug!(error = %e, "notifications/initialized send failed (expected for some backends)");
+    }
+
+    // Step 3: Send tools/list
+    let list_req = json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list"
+    });
+    let list_body = serde_json::to_string(&list_req)?;
+    let list_response = backend.send(&list_body).await?;
+    tracing::debug!(url = %backend.url(), response = %list_response, "MCP tools/list response");
+
+    // Parse tools from response
+    let parsed: serde_json::Value = serde_json::from_str(&list_response)?;
+    let tools_value = parsed
+        .get("result")
+        .and_then(|r| r.get("tools"))
+        .ok_or_else(|| anyhow::anyhow!("No tools in tools/list response"))?;
+
+    let tools: Vec<Tool> = serde_json::from_value(tools_value.clone())?;
+    tracing::info!(
+        url = %backend.url(),
+        count = tools.len(),
+        "Discovered tools from backend"
+    );
+
+    Ok(tools)
 }
