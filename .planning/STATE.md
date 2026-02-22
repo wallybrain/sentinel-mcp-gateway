@@ -5,24 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Every MCP tool call passes through one governed point with auth, audit, and rate limiting
-**Current focus:** Phase 12 - Network Hardening (next up)
+**Current focus:** Phase 12 complete, ready for Phase 13
 
 ## Current Position
 
 Phase: 12 of 14 (Network Hardening)
-Plan: Not started
-Status: Phase 11 complete, ready for Phase 12
-Last activity: 2026-02-22 -- Phase 11 cutover verified (session 6)
+Plan: 1 of 1 (complete)
+Status: Phase 12 complete
+Last activity: 2026-02-22 -- Phase 12 network hardening (session 7)
 
-Progress: [########░░] 80%
+Progress: [#########░] 86%
 
 ## Performance Metrics
 
 **v1.0 (completed):** 9 phases, 20 plans, 47 requirements, 138 tests, 3,776 LOC
 
 **v1.1 Velocity:**
-- Total plans completed: 4 (10-01, 10-02, 11-01, 11-02)
-- Phases completed: 2 (Phase 10, Phase 11)
+- Total plans completed: 5 (10-01, 10-02, 11-01, 11-02, 12-01)
+- Phases completed: 3 (Phase 10, Phase 11, Phase 12)
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -30,6 +30,7 @@ Progress: [########░░] 80%
 | 10    | 02   | -        | -     | -     |
 | 11    | 01   | 8min     | 3     | 2     |
 | 11    | 02   | ~30min   | 4     | 3     |
+| 12    | 01   | 2min     | 2     | 1     |
 
 ## Accumulated Context
 
@@ -45,6 +46,7 @@ Progress: [########░░] 80%
 - [Phase 11-02]: Exa backend disabled (commented out) -- needs EXA_API_KEY, not critical
 - [Phase 11-02]: Firecrawl works via env inheritance -- dotenvy loads .env, Command inherits parent env
 - [Phase 11-02]: Native binary deployment (not Docker) for Claude Code stdio transport
+- [Phase 12]: Sentinel DROP rules placed after existing 8080/before 9999 in iptables chain order
 
 ### Known Gotchas (carried from v1.0)
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -69,22 +71,22 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-22 (session 6)
-Stopped at: Phase 11 complete, ready for Phase 12
+Last session: 2026-02-22 (session 7)
+Stopped at: Completed 12-01-PLAN.md
 Resume file: None
 
 ### What was accomplished:
-- **Phase 11 COMPLETE**: Sentinel is live, all backends verified working
-- ContextForge stopped, containers preserved for rollback
-- sentinel.toml updated (exa disabled)
-- Tool calls confirmed: sqlite_databases, list_workflows, browser tools, context7, sequential-thinking
+- **Phase 12 COMPLETE**: Network hardening applied
+- Verified ports 9200/9201 bound to localhost only (NET-01)
+- Added iptables DROP rules for 9200/9201 on eth0 (NET-02)
+- Updated fix-iptables.sh for reboot persistence (NET-03)
+- Removed stale mcp-context-forge_mcpnet Docker network (NET-04)
 
 ### Next steps:
-1. Phase 12: Network Hardening — bind ports, iptables rules, clean stale networks
-2. Phase 13: Monitoring Stack — Prometheus, Grafana, Discord alerts
-3. Phase 14: Operations — log rotation, backups, reboot resilience
-4. Optional: Remove ContextForge containers when confident in stability
+1. Phase 13: Monitoring Stack -- Prometheus, Grafana, Discord alerts
+2. Phase 14: Operations -- log rotation, backups, reboot resilience
+3. Optional: Remove ContextForge containers when confident in stability
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22 session 6 — Phase 11 complete*
+*Last updated: 2026-02-22 session 7 -- Phase 12 complete*

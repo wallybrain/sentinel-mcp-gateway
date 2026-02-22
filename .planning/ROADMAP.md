@@ -33,7 +33,7 @@
 
 - [x] **Phase 10: Pre-Cutover Preparation** - Fix port drift, migrate sidecars, deploy Sentinel alongside ContextForge
 - [x] **Phase 11: Cutover Execution** - Stop ContextForge, register native binary, verify all backends (**completed 2026-02-22**)
-- [ ] **Phase 12: Network Hardening** - Lock down 127.0.0.1 binding, iptables rules, clean stale networks
+- [x] **Phase 12: Network Hardening** - Lock down 127.0.0.1 binding, iptables rules, clean stale networks (completed 2026-02-22)
 - [ ] **Phase 13: Monitoring Stack** - Prometheus + Grafana dashboard + n8n health checks with Discord alerts
 - [ ] **Phase 14: Operations** - Audit log rotation, backup integration, reboot resilience
 
@@ -132,7 +132,7 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14
 | 9. Observability & Hot Reload | v1.0 | 3/3 | Complete | 2026-02-22 |
 | 10. Pre-Cutover Preparation | v1.1 | 2/2 | Complete | 2026-02-22 |
 | 11. Cutover Execution | v1.1 | 2/2 | Complete | 2026-02-22 |
-| 12. Network Hardening | v1.1 | 0/1 | Not started | - |
+| 12. Network Hardening | 1/1 | Complete   | 2026-02-22 | - |
 | 13. Monitoring Stack | v1.1 | 0/TBD | Not started | - |
 | 14. Operations | v1.1 | 0/TBD | Not started | - |
 

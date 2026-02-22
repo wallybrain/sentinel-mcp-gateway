@@ -25,10 +25,10 @@ Requirements for Deploy & Harden milestone. Each maps to roadmap phases.
 
 ### Network Hardening
 
-- [ ] **NET-01**: Sentinel ports (9200, 9201) are bound to 127.0.0.1 only (verified unreachable from public IP)
-- [ ] **NET-02**: iptables DROP rules exist for ports 9200 and 9201 on eth0
-- [ ] **NET-03**: fix-iptables.sh is updated with Sentinel port rules
-- [ ] **NET-04**: Stale Docker networks from ContextForge are cleaned up
+- [x] **NET-01**: Sentinel ports (9200, 9201) are bound to 127.0.0.1 only (verified unreachable from public IP)
+- [x] **NET-02**: iptables DROP rules exist for ports 9200 and 9201 on eth0
+- [x] **NET-03**: fix-iptables.sh is updated with Sentinel port rules
+- [x] **NET-04**: Stale Docker networks from ContextForge are cleaned up
 
 ### Monitoring
 
@@ -91,10 +91,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CUT-03 | Phase 11 | Complete |
 | CUT-04 | Phase 11 | Pending |
 | CUT-05 | Phase 11 | Pending |
-| NET-01 | Phase 12 | Pending |
-| NET-02 | Phase 12 | Pending |
-| NET-03 | Phase 12 | Pending |
-| NET-04 | Phase 12 | Pending |
+| NET-01 | Phase 12 | Complete |
+| NET-02 | Phase 12 | Complete |
+| NET-03 | Phase 12 | Complete |
+| NET-04 | Phase 12 | Complete |
 | MON-01 | Phase 13 | Pending |
 | MON-02 | Phase 13 | Pending |
 | MON-03 | Phase 13 | Pending |
