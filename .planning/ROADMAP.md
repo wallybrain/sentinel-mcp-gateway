@@ -30,7 +30,10 @@
   3. The config defines backend entries, role-to-tool mappings, rate limit settings, and kill switches in a typed schema
   4. Secrets (JWT key, Postgres password) are read from environment variables, never from the config file
   5. JSON-RPC request ID remapping logic exists and has unit tests proving no ID collision across backends
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 01-01-PLAN.md -- Scaffold Cargo project with typed TOML config system and integration tests
+- [ ] 01-02-PLAN.md -- JSON-RPC 2.0 types and request ID remapper (TDD)
 
 ### Phase 2: MCP Protocol Layer
 **Goal**: The gateway speaks the MCP protocol -- handles initialize handshake, aggregates tool catalogs, and reads/writes stdio transport
@@ -139,7 +142,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Config | 0/? | Not started | - |
+| 1. Foundation & Config | 0/2 | Planned | - |
 | 2. MCP Protocol Layer | 0/? | Not started | - |
 | 3. HTTP Backend Routing | 0/? | Not started | - |
 | 4. Authentication & Authorization | 0/? | Not started | - |
