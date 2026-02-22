@@ -29,14 +29,14 @@ max_connections = 10
 [[backends]]
 name = "n8n"
 type = "http"
-url = "http://mcp-n8n:3000"
+url = "http://127.0.0.1:3001"
 timeout_secs = 60
 retries = 3
 
 [[backends]]
 name = "sqlite"
 type = "http"
-url = "http://mcp-sqlite:3000"
+url = "http://127.0.0.1:3002"
 timeout_secs = 60
 retries = 3
 
@@ -44,7 +44,7 @@ retries = 3
 name = "context7"
 type = "stdio"
 command = "node"
-args = ["/usr/local/lib/node_modules/@upstash/context7-mcp/dist/index.js"]
+args = ["/home/lwb3/.nvm/versions/node/v20.20.0/lib/node_modules/@upstash/context7-mcp/dist/index.js"]
 restart_on_exit = true
 max_restarts = 5
 
@@ -52,25 +52,25 @@ max_restarts = 5
 name = "firecrawl"
 type = "stdio"
 command = "node"
-args = ["/usr/local/lib/node_modules/firecrawl-mcp/dist/index.js"]
+args = ["/home/lwb3/.nvm/versions/node/v20.20.0/lib/node_modules/firecrawl-mcp/dist/index.js"]
 
 [[backends]]
 name = "exa"
 type = "stdio"
 command = "node"
-args = ["/usr/local/lib/node_modules/exa-mcp-server/build/index.js"]
+args = ["/home/lwb3/.nvm/versions/node/v20.20.0/lib/node_modules/exa-mcp-server/.smithery/stdio/index.cjs"]
 
 [[backends]]
 name = "sequential-thinking"
 type = "stdio"
 command = "node"
-args = ["/usr/local/lib/node_modules/@modelcontextprotocol/server-sequential-thinking/dist/index.js"]
+args = ["/home/lwb3/.nvm/versions/node/v20.20.0/lib/node_modules/@modelcontextprotocol/server-sequential-thinking/dist/index.js"]
 
 [[backends]]
 name = "playwright"
 type = "stdio"
 command = "node"
-args = ["/usr/local/lib/node_modules/@anthropic/mcp-playwright/dist/index.js"]
+args = ["/home/lwb3/.nvm/versions/node/v20.20.0/lib/node_modules/@playwright/mcp/cli.js"]
 
 # RBAC - Role-Based Access Control
 # Each role defines permissions and optionally denied tools

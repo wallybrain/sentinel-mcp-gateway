@@ -1,29 +1,4 @@
 services:
-  gateway:
-    build: .
-    container_name: sentinel-gateway
-    restart: unless-stopped
-    stdin_open: true
-    environment:
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - SENTINEL_TOKEN=${SENTINEL_TOKEN}
-      - DATABASE_URL=postgres://sentinel:${POSTGRES_PASSWORD}@postgres:5432/sentinel
-      - RUST_LOG=info
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - "127.0.0.1:9202:9200"
-      - "127.0.0.1:9201:9201"
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://127.0.0.1:9201/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
-    networks:
-      - sentinelnet
-
   postgres:
     image: postgres:16-alpine
     container_name: sentinel-postgres
@@ -34,6 +9,8 @@ services:
       - POSTGRES_DB=sentinel
     volumes:
       - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel"]
       interval: 5s
@@ -54,6 +31,8 @@ services:
       - MCP_PORT=3000
       - N8N_URL=http://n8n:5678
       - N8N_API_KEY=${N8N_API_KEY}
+    ports:
+      - "127.0.0.1:3001:3000"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
       interval: 30s
@@ -85,6 +64,8 @@ services:
       - SQLITE_DB_DIR=/data
     volumes:
       - /home/lwb3/databases:/data
+    ports:
+      - "127.0.0.1:3002:3000"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
       interval: 30s
