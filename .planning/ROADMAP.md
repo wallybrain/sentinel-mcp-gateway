@@ -45,7 +45,7 @@ Plans:
   3. The gateway aggregates `tools/list` from stub/mock backends into a single unified catalog
 **Plans:** 2 plans
 Plans:
-- [ ] 02-01-PLAN.md -- rmcp dependency, stdio transport, and MCP lifecycle state machine
+- [x] 02-01-PLAN.md -- rmcp dependency, stdio transport, and MCP lifecycle state machine
 - [ ] 02-02-PLAN.md -- Tool catalog aggregation, dispatch loop, and end-to-end integration tests
 
 ### Phase 3: HTTP Backend Routing
@@ -146,7 +146,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Config | 2/2 | Complete | 2026-02-22 |
-| 2. MCP Protocol Layer | 0/2 | Planning complete | - |
+| 2. MCP Protocol Layer | 1/2 | In progress | - |
 | 3. HTTP Backend Routing | 0/? | Not started | - |
 | 4. Authentication & Authorization | 0/? | Not started | - |
 | 5. Audit Logging | 0/? | Not started | - |
