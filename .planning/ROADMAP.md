@@ -73,7 +73,7 @@ Plans:
   3. `tools/list` returns only the tools the caller's role is permitted to use (unauthorized tools are invisible)
   4. `tools/call` for a tool the caller's role lacks permission for is rejected with a JSON-RPC error
   5. The same RBAC check function is used for both `tools/list` filtering and `tools/call` enforcement
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 04-01-PLAN.md -- JWT validator, RBAC module, and auth unit tests
 - [x] 04-02-PLAN.md -- Wire auth into dispatch loop and update integration tests
@@ -154,7 +154,7 @@ Plans:
 | 1. Foundation & Config | 2/2 | Complete | 2026-02-22 |
 | 2. MCP Protocol Layer | 2/2 | Complete | 2026-02-22 |
 | 3. HTTP Backend Routing | 2/2 | Complete | 2026-02-22 |
-| 4. Authentication & Authorization | 2/2 | Complete | 2026-02-22 |
+| 4. Authentication & Authorization | 2/2 | Complete    | 2026-02-22 |
 | 5. Audit Logging | 0/? | Not started | - |
 | 6. Rate Limiting & Kill Switch | 0/? | Not started | - |
 | 7. Health & Reliability | 0/? | Not started | - |
