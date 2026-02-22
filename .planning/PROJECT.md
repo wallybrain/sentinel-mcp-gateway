@@ -28,7 +28,13 @@ Every MCP tool call passes through one governed point with auth, audit, and rate
 
 ### Active
 
-(None — ready for v1.1 planning)
+#### v1.1 Deploy & Harden
+- [ ] Deploy Sentinel to VPS, replacing ContextForge as the live MCP gateway
+- [ ] Update Claude Code MCP config to point at Sentinel
+- [ ] Verify all tools work end-to-end through Sentinel
+- [ ] Harden network binding (127.0.0.1 only, iptables verified)
+- [ ] n8n health monitoring with Discord alerts on failure
+- [ ] Grafana dashboard for Prometheus metrics (request rates, latencies, errors, backend status)
 
 ### Out of Scope
 
@@ -61,7 +67,7 @@ Every MCP tool call passes through one governed point with auth, audit, and rate
 ## Constraints
 
 - **Language**: Rust — learning goal, performance, single binary
-- **Deployment**: Docker Compose — gateway + Postgres, coexists with ContextForge during transition
+- **Deployment**: Docker Compose — gateway + Postgres, replacing ContextForge
 - **State**: PostgreSQL — audit logs, migrations embedded at compile time
 - **Compatibility**: Must produce identical MCP responses to ContextForge for existing tools
 - **Resources**: <100 MB RAM target, shares VPS with 14 other containers
@@ -81,6 +87,18 @@ Every MCP tool call passes through one governed point with auth, audit, and rate
 | Explicit Prometheus registry (not global) | Testable metrics in isolation | ✓ Good — 4 metric unit tests pass cleanly |
 | Single SharedHotConfig RwLock | Atomic swap prevents partial config state | ✓ Good — no race conditions between kill switch and rate limiter |
 | SSE full-buffer accumulation | MCP backends return single-event SSE streams | ⚠️ Revisit if streaming backends added |
+| Localhost-only deployment | No public exposure needed — Claude runs on same VPS | — Pending |
+| Clean cutover (not parallel) | 138 tests + 47 requirements verified, rollback is trivial | — Pending |
+
+## Current Milestone: v1.1 Deploy & Harden
+
+**Goal:** Replace ContextForge with Sentinel on the VPS, add monitoring and network hardening.
+
+**Target features:**
+- Clean cutover from ContextForge to Sentinel
+- Network hardening (127.0.0.1 binding, iptables verification)
+- n8n health monitoring → Discord alerts
+- Grafana dashboard for Prometheus metrics
 
 ---
-*Last updated: 2026-02-22 after v1.0 milestone*
+*Last updated: 2026-02-22 after v1.1 milestone start*

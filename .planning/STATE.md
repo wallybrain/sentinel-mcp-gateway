@@ -5,22 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Every MCP tool call passes through one governed point with auth, audit, and rate limiting
-**Current focus:** v1.0 shipped — planning next milestone
+**Current focus:** v1.1 Deploy & Harden
 
 ## Current Position
 
 | Field | Value |
 |-------|-------|
-| Milestone | v1.0 SHIPPED |
-| Status | All 9 phases complete, 47/47 requirements, 138 tests |
+| Milestone | v1.1 Deploy & Harden |
+| Phase | Not started (defining requirements) |
+| Status | Defining requirements |
+| Last activity | 2026-02-22 — Milestone v1.1 started |
 
 ## Performance Metrics
 
 | Metric | Value |
 |--------|-------|
-| Phases completed | 9 |
-| Plans completed | 20 |
-| Requirements completed | 47/47 |
+| Phases completed (v1.0) | 9 |
+| Plans completed (v1.0) | 20 |
+| Requirements completed (v1.0) | 47/47 |
 | Lines of Rust | 3,776 |
 | Commits | 99 |
 
@@ -38,17 +40,16 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 - None
 
 ### TODOs
-- Deploy Sentinel Gateway to VPS (replace ContextForge)
-- Plan v1.1 milestone
+- (Managed by v1.1 requirements and roadmap)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Completed v1.0 milestone — all 9 phases, Dockerfile + docker-compose.yml created, audit passed 47/47
-- **Stopped at:** Milestone completion and archival
-- **Next step:** `/gsd:new-milestone` for v1.1
+- **What happened:** Started v1.1 milestone — Deploy & Harden
+- **Stopped at:** Defining requirements
+- **Next step:** Complete requirements → roadmap
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22 after v1.0 milestone completion*
+*Last updated: 2026-02-22 after v1.1 milestone start*
