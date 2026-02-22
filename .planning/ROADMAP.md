@@ -147,7 +147,7 @@ Plans:
   3. Invalid arguments are rejected at the gateway with a descriptive JSON-RPC error (never forwarded to backend)
   4. Sending SIGHUP or modifying the config file triggers a config reload without restarting the gateway
   5. Kill switch changes applied via hot reload take effect immediately on the next request
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 Plans:
 - [x] 09-01-PLAN.md -- Prometheus metrics module and /metrics endpoint on health server
 - [x] 09-02-PLAN.md -- Schema validation module and hot-reloadable config struct
@@ -176,7 +176,7 @@ Plans:
 | 6. Rate Limiting & Kill Switch | 2/2 | Complete    | 2026-02-22 |
 | 7. Health & Reliability | 2/2 | Complete    | 2026-02-22 |
 | 8. stdio Backend Management | 3/3 | Complete    | 2026-02-22 |
-| 9. Observability & Hot Reload | 3/3 | Complete | 2026-02-22 |
+| 9. Observability & Hot Reload | 3/3 | Complete    | 2026-02-22 |
 | 10. Deployment & Integration | 0/? | Not started | - |
 
 ---
