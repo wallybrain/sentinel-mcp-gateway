@@ -43,15 +43,19 @@ async fn readiness(
     }
 }
 
+pub fn build_health_router(health_map: BackendHealthMap) -> Router {
+    Router::new()
+        .route("/health", get(liveness))
+        .route("/ready", get(readiness))
+        .with_state(health_map)
+}
+
 pub async fn run_health_server(
     addr: &str,
     health_map: BackendHealthMap,
     cancel: CancellationToken,
 ) -> anyhow::Result<()> {
-    let app = Router::new()
-        .route("/health", get(liveness))
-        .route("/ready", get(readiness))
-        .with_state(health_map);
+    let app = build_health_router(health_map);
 
     let listener = TcpListener::bind(addr).await?;
     tracing::info!(addr = %addr, "Health server listening");
