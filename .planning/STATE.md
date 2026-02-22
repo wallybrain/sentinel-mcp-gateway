@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 4 complete -- JWT auth + RBAC integrated into dispatch loop |
+| Current Focus | Phase 5 in progress -- audit module foundation complete, dispatch integration next |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -13,9 +13,9 @@
 
 | Field | Value |
 |-------|-------|
-| Phase | 04-authentication-authorization |
-| Plan | 04-02 (complete) |
-| Status | Phase 4 complete (2/2 plans) |
+| Phase | 05-audit-logging |
+| Plan | 05-01 (complete) |
+| Status | Phase 5 in progress (1/2 plans) |
 
 **Overall Progress:**
 ```
@@ -23,7 +23,7 @@ Phase  1 [x] Foundation & Config (2/2 plans)
 Phase  2 [x] MCP Protocol Layer (2/2 plans)
 Phase  3 [x] HTTP Backend Routing (2/2 plans)
 Phase  4 [x] Authentication & Authorization (2/2 plans)
-Phase  5 [ ] Audit Logging
+Phase  5 [~] Audit Logging (1/2 plans)
 Phase  6 [ ] Rate Limiting & Kill Switch
 Phase  7 [ ] Health & Reliability
 Phase  8 [ ] stdio Backend Management
@@ -36,9 +36,9 @@ Phase 10 [ ] Deployment & Integration
 | Metric | Value |
 |--------|-------|
 | Phases completed | 4/10 |
-| Plans completed | 8/? |
-| Requirements completed | 19/47 |
-| Session count | 6 |
+| Plans completed | 9/? |
+| Requirements completed | 21/47 |
+| Session count | 7 |
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -48,10 +48,14 @@ Phase 10 [ ] Deployment & Integration
 | 03 | 02 | 4min | 2 | 6 |
 | 04 | 01 | 4min | 2 | 6 |
 | 04 | 02 | 4min | 2 | 3 |
+| 05 | 01 | 7min | 2 | 7 |
 
 ## Accumulated Context
 
 ### Key Decisions
+- Runtime sqlx::query() instead of compile-time macros (no DATABASE_URL at build time)
+- AuditEntry uses Clone derive for writer drain pattern
+- Writer drains remaining entries on channel close (future-proofing for Phase 7)
 - Rust for performance, learning, and single-binary deployment
 - PostgreSQL for audit logs and config persistence
 - Docker Compose for deployment (coexist with ContextForge during dev)
@@ -89,15 +93,15 @@ Phase 10 [ ] Deployment & Integration
 - None
 
 ### TODOs
-- Plan Phase 5 (Audit Logging)
+- Execute Phase 5 Plan 02 (wire audit into dispatch loop)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 04-02-PLAN.md -- wired auth into dispatch loop (CallerIdentity + RBAC filtering), 9 new integration tests (85 total)
-- **Stopped at:** Completed 04-02-PLAN.md (Phase 4 complete)
-- **Next step:** Plan Phase 5 (Audit Logging)
+- **What happened:** Executed 05-01-PLAN.md -- audit module foundation with PgPool, migrations, AuditEntry struct, and async writer task
+- **Stopped at:** Completed 05-01-PLAN.md (Phase 5, 1/2 plans)
+- **Next step:** Execute 05-02-PLAN.md (wire audit into dispatch loop)
 
 ---
 *State initialized: 2026-02-22*

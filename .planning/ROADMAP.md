@@ -89,7 +89,7 @@ Plans:
   4. Database schema migrations run automatically when the gateway starts (no manual SQL required)
 **Plans:** 2 plans
 Plans:
-- [ ] 05-01-PLAN.md -- Audit module with PgPool, embedded migrations, AuditEntry struct, and async writer
+- [x] 05-01-PLAN.md -- Audit module with PgPool, embedded migrations, AuditEntry struct, and async writer
 - [ ] 05-02-PLAN.md -- Wire audit into dispatch loop and main.rs startup sequence
 
 ### Phase 6: Rate Limiting & Kill Switch
@@ -158,7 +158,7 @@ Plans:
 | 2. MCP Protocol Layer | 2/2 | Complete | 2026-02-22 |
 | 3. HTTP Backend Routing | 2/2 | Complete | 2026-02-22 |
 | 4. Authentication & Authorization | 2/2 | Complete    | 2026-02-22 |
-| 5. Audit Logging | 0/2 | Planning complete | - |
+| 5. Audit Logging | 1/2 | In progress | - |
 | 6. Rate Limiting & Kill Switch | 0/? | Not started | - |
 | 7. Health & Reliability | 0/? | Not started | - |
 | 8. stdio Backend Management | 0/? | Not started | - |

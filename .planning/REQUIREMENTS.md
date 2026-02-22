@@ -47,7 +47,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **AUDIT-01**: Gateway logs every tool call to Postgres with: timestamp, client identity, tool name, backend, request args (redactable), response status, latency
 - [ ] **AUDIT-02**: Gateway assigns a unique request ID to each tool call, included in all log entries
-- [ ] **AUDIT-03**: Audit logging is async and does not block request processing
+- [x] **AUDIT-03**: Audit logging is async and does not block request processing
 
 ### Rate Limiting
 
@@ -88,7 +88,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **DEPLOY-01**: Gateway builds as a single Rust binary via `cargo build --release`
 - [ ] **DEPLOY-02**: Gateway ships as a Docker image with multi-stage build (build + runtime)
 - [ ] **DEPLOY-03**: Docker Compose file defines gateway + Postgres with health checks and restart policies
-- [ ] **DEPLOY-04**: Database schema migrations run automatically on gateway startup
+- [x] **DEPLOY-04**: Database schema migrations run automatically on gateway startup
 
 ## v2 Requirements
 
@@ -163,7 +163,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROTO-06 | Phase 2 | Complete |
 | AUDIT-01 | Phase 5 | Pending |
 | AUDIT-02 | Phase 5 | Pending |
-| AUDIT-03 | Phase 5 | Pending |
+| AUDIT-03 | Phase 5 | Complete |
 | RATE-01 | Phase 6 | Pending |
 | RATE-02 | Phase 6 | Pending |
 | RATE-03 | Phase 6 | Pending |
@@ -186,7 +186,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DEPLOY-01 | Phase 1 | Complete |
 | DEPLOY-02 | Phase 10 | Pending |
 | DEPLOY-03 | Phase 10 | Pending |
-| DEPLOY-04 | Phase 5 | Pending |
+| DEPLOY-04 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 47 total
