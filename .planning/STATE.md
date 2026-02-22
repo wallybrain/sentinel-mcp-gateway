@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 9 in progress -- Prometheus metrics module and /metrics endpoint complete |
+| Current Focus | Phase 9 in progress -- metrics, schema validation, and hot config complete (2/3 plans) |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -14,8 +14,8 @@
 | Field | Value |
 |-------|-------|
 | Phase | 09-observability |
-| Plan | 02 |
-| Status | Phase 9 plan 01 complete, continuing Phase 9 |
+| Plan | 03 |
+| Status | Phase 9 plans 01-02 complete, plan 03 remaining |
 
 **Overall Progress:**
 ```
@@ -27,7 +27,7 @@ Phase  5 [x] Audit Logging (2/2 plans)
 Phase  6 [x] Rate Limiting & Kill Switch (2/2 plans)
 Phase  7 [x] Health & Reliability (2/2 plans)
 Phase  8 [x] stdio Backend Management (3/3 plans)
-Phase  9 [ ] Observability & Hot Reload (1/? plans)
+Phase  9 [ ] Observability & Hot Reload (2/3 plans)
 Phase 10 [ ] Deployment & Integration
 ```
 
@@ -36,7 +36,7 @@ Phase 10 [ ] Deployment & Integration
 | Metric | Value |
 |--------|-------|
 | Phases completed | 8/10 |
-| Plans completed | 18/? |
+| Plans completed | 19/? |
 | Requirements completed | 43/47 |
 | Session count | 7 |
 
@@ -58,6 +58,7 @@ Phase 10 [ ] Deployment & Integration
 | 08 | 02 | 12min | 2 | 2 |
 | 08 | 03 | 8min | 2 | 7 |
 | 09 | 01 | 6min | 2 | 4 |
+| 09 | 02 | 6min | 2 | 6 |
 
 ## Accumulated Context
 
@@ -115,6 +116,9 @@ Phase 10 [ ] Deployment & Integration
 - 5s timeout for supervisor shutdown during ordered shutdown sequence
 - Explicit prometheus::Registry (not default_registry) for test isolation
 - HealthAppState struct combines BackendHealthMap + Option<Arc<Metrics>> for axum state
+- jsonschema 0.42 for tool argument validation (instance_path() is method, not field)
+- Clone derive on KillSwitchConfig for HotConfig creation from parsed config
+- HotConfig only reloads kill_switch + rate_limits (backend/auth require restart)
 
 ### Known Gotchas
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -126,20 +130,21 @@ Phase 10 [ ] Deployment & Integration
 - SSE client disconnect is NOT cancellation per MCP spec
 - Auth bypass pitfall: RBAC must filter both tools/list AND tools/call
 - Prometheus only includes metric families in gather output after first observation
+- jsonschema 0.42: instance_path() is a method call, not a field access
 
 ### Blockers
 - None
 
 ### TODOs
-- Execute Phase 9 remaining plans (02, 03)
+- Execute Phase 9 Plan 03 (wire validation + hot config into gateway dispatch)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 09-01-PLAN.md -- Prometheus metrics module (5 metric families, sentinel_* prefix) and /metrics endpoint on health server
-- **Stopped at:** Completed 09-01-PLAN.md (Phase 9: 1/? plans complete)
-- **Next step:** Execute Phase 9 plan 02
+- **What happened:** Executed 09-02-PLAN.md -- SchemaCache for JSON schema validation, HotConfig struct for atomic config reload, 8 unit tests (33 total)
+- **Stopped at:** Completed 09-02-PLAN.md (Phase 9: 2/3 plans complete)
+- **Next step:** Execute Phase 9 Plan 03 (wire validation + hot config into gateway dispatch)
 
 ---
 *State initialized: 2026-02-22*
