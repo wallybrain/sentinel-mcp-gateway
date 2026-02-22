@@ -8,7 +8,7 @@
 ## Phases
 
 - [x] **Phase 1: Foundation & Config** - Compiling binary with TOML config, JSON-RPC 2.0 types, and request ID remapping
-- [ ] **Phase 2: MCP Protocol Layer** - MCP lifecycle state machine, tool catalog aggregation, and stdio upstream transport
+- [x] **Phase 2: MCP Protocol Layer** - MCP lifecycle state machine, tool catalog aggregation, and stdio upstream transport
 - [ ] **Phase 3: HTTP Backend Routing** - Route tool calls to HTTP backends with connection pooling, retries, and SSE passthrough
 - [ ] **Phase 4: Authentication & Authorization** - JWT validation and per-tool per-role RBAC on every request
 - [ ] **Phase 5: Audit Logging** - Structured audit trail to Postgres with async writes and auto-migrations
@@ -46,7 +46,7 @@ Plans:
 **Plans:** 2 plans
 Plans:
 - [x] 02-01-PLAN.md -- rmcp dependency, stdio transport, and MCP lifecycle state machine
-- [ ] 02-02-PLAN.md -- Tool catalog aggregation, dispatch loop, and end-to-end integration tests
+- [x] 02-02-PLAN.md -- Tool catalog aggregation, dispatch loop, and end-to-end integration tests
 
 ### Phase 3: HTTP Backend Routing
 **Goal**: Tool calls route to real HTTP backends (n8n, sqlite) with reliable connection handling and streaming support
@@ -146,7 +146,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Config | 2/2 | Complete | 2026-02-22 |
-| 2. MCP Protocol Layer | 1/2 | In progress | - |
+| 2. MCP Protocol Layer | 2/2 | Complete | 2026-02-22 |
 | 3. HTTP Backend Routing | 0/? | Not started | - |
 | 4. Authentication & Authorization | 0/? | Not started | - |
 | 5. Audit Logging | 0/? | Not started | - |

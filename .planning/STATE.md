@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 2 in progress -- plan 02-01 done, 02-02 next |
+| Current Focus | Phase 2 complete -- ready for Phase 3 (HTTP Backend Routing) |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -13,14 +13,14 @@
 
 | Field | Value |
 |-------|-------|
-| Phase | 02-mcp-protocol-layer |
-| Plan | 02-01 (complete) |
-| Status | Phase 2 in progress (1/2 plans) |
+| Phase | 02-mcp-protocol-layer (complete) |
+| Plan | 02-02 (complete) |
+| Status | Phase 2 complete (2/2 plans) |
 
 **Overall Progress:**
 ```
 Phase  1 [x] Foundation & Config (2/2 plans)
-Phase  2 [~] MCP Protocol Layer (1/2 plans)
+Phase  2 [x] MCP Protocol Layer (2/2 plans)
 Phase  3 [ ] HTTP Backend Routing
 Phase  4 [ ] Authentication & Authorization
 Phase  5 [ ] Audit Logging
@@ -35,14 +35,15 @@ Phase 10 [ ] Deployment & Integration
 
 | Metric | Value |
 |--------|-------|
-| Phases completed | 1/10 |
-| Plans completed | 3/? |
-| Requirements completed | 8/47 |
-| Session count | 3 |
+| Phases completed | 2/10 |
+| Plans completed | 4/? |
+| Requirements completed | 11/47 |
+| Session count | 4 |
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 02 | 01 | 5min | 2 | 8 |
+| 02 | 02 | 4min | 2 | 7 |
 
 ## Accumulated Context
 
@@ -58,6 +59,8 @@ Phase 10 [ ] Deployment & Integration
 - JSON-RPC ID remapping from Phase 1 (architectural decision that cannot change later)
 - Own JSON-RPC types instead of using jsonrpc-core for max serde control
 - AtomicU64 counter starts at 1 (not 0) for gateway IDs -- avoids null-like zero values
+- Lenient config loading (load_config_lenient) skips auth/postgres validation for early phases
+- Tool collision resolution prefixes with backend_name__tool_name
 
 ### Known Gotchas
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -73,16 +76,16 @@ Phase 10 [ ] Deployment & Integration
 - None
 
 ### TODOs
-- Execute 02-02-PLAN.md (tool catalog, dispatch loop, integration tests)
+- Plan and execute Phase 3 (HTTP Backend Routing)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 02-01-PLAN.md -- rmcp dependency, stdio transport, MCP state machine with 11 tests (30 total)
-- **Stopped at:** Completed 02-01-PLAN.md
-- **Next step:** Execute 02-02-PLAN.md (tool catalog aggregation, dispatch loop, end-to-end tests)
+- **What happened:** Executed 02-02-PLAN.md -- tool catalog, dispatch loop, main.rs wiring, 11 new tests (41 total)
+- **Stopped at:** Completed 02-02-PLAN.md (Phase 2 complete)
+- **Next step:** Plan Phase 3 (HTTP Backend Routing)
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22T02:43Z*
+*Last updated: 2026-02-22T02:49Z*
