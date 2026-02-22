@@ -71,10 +71,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Configuration
 
-- [ ] **CONFIG-01**: All gateway behavior is configured via a single `sentinel.toml` file
-- [ ] **CONFIG-02**: Config includes: auth settings, backend definitions, role-to-tool mappings, rate limits, kill switches
+- [x] **CONFIG-01**: All gateway behavior is configured via a single `sentinel.toml` file
+- [x] **CONFIG-02**: Config includes: auth settings, backend definitions, role-to-tool mappings, rate limits, kill switches
 - [ ] **CONFIG-03**: Gateway supports hot config reload via SIGHUP signal or file watch
-- [ ] **CONFIG-04**: Secrets (JWT key, Postgres password) are injected via environment variables, never in config file
+- [x] **CONFIG-04**: Secrets (JWT key, Postgres password) are injected via environment variables, never in config file
 
 ### Observability
 
@@ -85,7 +85,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Deployment
 
-- [ ] **DEPLOY-01**: Gateway builds as a single Rust binary via `cargo build --release`
+- [x] **DEPLOY-01**: Gateway builds as a single Rust binary via `cargo build --release`
 - [ ] **DEPLOY-02**: Gateway ships as a Docker image with multi-stage build (build + runtime)
 - [ ] **DEPLOY-03**: Docker Compose file defines gateway + Postgres with health checks and restart policies
 - [ ] **DEPLOY-04**: Database schema migrations run automatically on gateway startup
@@ -175,15 +175,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HEALTH-03 | Phase 7 | Pending |
 | HEALTH-04 | Phase 7 | Pending |
 | HEALTH-05 | Phase 7 | Pending |
-| CONFIG-01 | Phase 1 | Pending |
-| CONFIG-02 | Phase 1 | Pending |
+| CONFIG-01 | Phase 1 | Complete |
+| CONFIG-02 | Phase 1 | Complete |
 | CONFIG-03 | Phase 9 | Pending |
-| CONFIG-04 | Phase 1 | Pending |
+| CONFIG-04 | Phase 1 | Complete |
 | OBS-01 | Phase 9 | Pending |
 | OBS-02 | Phase 9 | Pending |
 | OBS-03 | Phase 9 | Pending |
 | OBS-04 | Phase 9 | Pending |
-| DEPLOY-01 | Phase 1 | Pending |
+| DEPLOY-01 | Phase 1 | Complete |
 | DEPLOY-02 | Phase 10 | Pending |
 | DEPLOY-03 | Phase 10 | Pending |
 | DEPLOY-04 | Phase 5 | Pending |

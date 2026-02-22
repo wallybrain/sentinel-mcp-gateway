@@ -32,7 +32,7 @@
   5. JSON-RPC request ID remapping logic exists and has unit tests proving no ID collision across backends
 **Plans:** 2 plans
 Plans:
-- [ ] 01-01-PLAN.md -- Scaffold Cargo project with typed TOML config system and integration tests
+- [x] 01-01-PLAN.md -- Scaffold Cargo project with typed TOML config system and integration tests
 - [ ] 01-02-PLAN.md -- JSON-RPC 2.0 types and request ID remapper (TDD)
 
 ### Phase 2: MCP Protocol Layer
@@ -142,7 +142,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Config | 0/2 | Planned | - |
+| 1. Foundation & Config | 1/2 | In Progress | - |
 | 2. MCP Protocol Layer | 0/? | Not started | - |
 | 3. HTTP Backend Routing | 0/? | Not started | - |
 | 4. Authentication & Authorization | 0/? | Not started | - |
@@ -155,4 +155,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-02-22*
-*Last updated: 2026-02-22*
+*Last updated: 2026-02-22T02:10Z*
