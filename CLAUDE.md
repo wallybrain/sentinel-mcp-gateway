@@ -11,7 +11,6 @@ Rust-based enterprise MCP gateway — single binary replacing IBM ContextForge (
 |------|---------|
 | `src/` | Rust source (3,776 LOC, 138 tests) |
 | `sentinel.toml` | Native runtime config (7 backends) |
-| `sentinel-docker.toml` | Docker runtime config (HTTP backends only) |
 | `docker-compose.yml` | Sidecar services (postgres, mcp-n8n, mcp-sqlite) |
 | `.env` | Secrets — JWT, Postgres, Sentinel token, API keys (gitignored) |
 | `.planning/` | GSD project planning (roadmap, phases, state) |
