@@ -131,7 +131,11 @@ Plans:
   3. Multiple concurrent requests to the same stdio backend are multiplexed over its single stdin/stdout using request ID correlation
   4. A crashed stdio backend is detected and restarted with exponential backoff
   5. On gateway shutdown, all stdio child processes are terminated cleanly (entire process group, not just direct child)
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 08-01-PLAN.md -- StdioBackend struct with multiplexer, process group spawn/kill, and unit tests
+- [ ] 08-02-PLAN.md -- Supervisor task with crash detection, exponential backoff restart, and MCP handshake
+- [ ] 08-03-PLAN.md -- Wire stdio into gateway dispatch and main.rs with Backend enum and integration tests
 
 ### Phase 9: Observability & Hot Reload
 **Goal**: The gateway exposes operational metrics, validates tool inputs, and supports zero-downtime config changes
@@ -167,7 +171,7 @@ Plans:
 | 5. Audit Logging | 2/2 | Complete    | 2026-02-22 |
 | 6. Rate Limiting & Kill Switch | 2/2 | Complete    | 2026-02-22 |
 | 7. Health & Reliability | 2/2 | Complete    | 2026-02-22 |
-| 8. stdio Backend Management | 0/? | Not started | - |
+| 8. stdio Backend Management | 0/3 | Planning | - |
 | 9. Observability & Hot Reload | 0/? | Not started | - |
 | 10. Deployment & Integration | 0/? | Not started | - |
 
