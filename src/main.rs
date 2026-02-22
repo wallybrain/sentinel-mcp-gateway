@@ -9,7 +9,8 @@ use tokio_util::sync::CancellationToken;
 
 use sentinel_gateway::audit;
 use sentinel_gateway::auth::jwt::{CallerIdentity, JwtValidator};
-use sentinel_gateway::backend::{build_http_client, discover_tools, Backend, HttpBackend};
+use sentinel_gateway::backend::{build_http_client, discover_tools, Backend, HttpBackend, StdioBackend};
+use sentinel_gateway::backend::stdio::run_supervisor;
 use sentinel_gateway::config::types::BackendType;
 use sentinel_gateway::health::checker::health_checker;
 use sentinel_gateway::health::circuit_breaker::CircuitBreaker;
@@ -90,8 +91,61 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Create CancellationToken for graceful shutdown (needed by stdio supervisors and signal handler)
+    let cancel = CancellationToken::new();
+
+    // Spawn stdio backends via supervisors
+    let stdio_backends: Vec<_> = config
+        .backends
+        .iter()
+        .filter(|b| b.backend_type == BackendType::Stdio)
+        .cloned()
+        .collect();
+
+    let mut supervisor_handles: Vec<tokio::task::JoinHandle<()>> = Vec::new();
+
+    for backend_config in &stdio_backends {
+        let (tools_tx, mut tools_rx) =
+            mpsc::channel::<(String, Vec<rmcp::model::Tool>, StdioBackend)>(1);
+
+        let cfg = backend_config.clone();
+        let cancel_clone = cancel.clone();
+        let handle = tokio::spawn(async move {
+            run_supervisor(cfg, cancel_clone, tools_tx).await;
+        });
+        supervisor_handles.push(handle);
+
+        tracing::info!(name = %backend_config.name, "Waiting for stdio backend tool discovery");
+
+        match tokio::time::timeout(Duration::from_secs(30), tools_rx.recv()).await {
+            Ok(Some((name, tools, stdio_backend))) => {
+                let tool_count = tools.len();
+                catalog.register_backend(&name, tools);
+                backends_map.insert(name.clone(), Backend::Stdio(stdio_backend));
+                discovery_succeeded = true;
+                tracing::info!(
+                    name = %name,
+                    tools = tool_count,
+                    "Stdio backend registered"
+                );
+            }
+            Ok(None) => {
+                tracing::error!(
+                    name = %backend_config.name,
+                    "Stdio supervisor channel closed before tool discovery"
+                );
+            }
+            Err(_) => {
+                tracing::error!(
+                    name = %backend_config.name,
+                    "Stdio backend tool discovery timed out (30s), supervisor will keep retrying in background"
+                );
+            }
+        }
+    }
+
     if !discovery_succeeded {
-        tracing::warn!("No HTTP backends available, falling back to stub catalog");
+        tracing::warn!("No backends available, falling back to stub catalog");
         catalog = sentinel_gateway::catalog::create_stub_catalog();
     }
 
@@ -187,9 +241,6 @@ async fn main() -> anyhow::Result<()> {
         })
         .collect();
 
-    // Create CancellationToken for graceful shutdown
-    let cancel = CancellationToken::new();
-
     // Spawn signal handler
     let cancel_signal = cancel.clone();
     tokio::spawn(async move {
@@ -252,6 +303,18 @@ async fn main() -> anyhow::Result<()> {
 
     // Ordered shutdown sequence
     cancel.cancel();
+
+    // Wait for stdio supervisors to terminate their process groups (5s timeout)
+    if !supervisor_handles.is_empty() {
+        tracing::info!(count = supervisor_handles.len(), "Waiting for stdio supervisors to shut down");
+        for (i, handle) in supervisor_handles.into_iter().enumerate() {
+            match tokio::time::timeout(Duration::from_secs(5), handle).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => tracing::warn!(index = i, error = %e, "Supervisor task panicked"),
+                Err(_) => tracing::warn!(index = i, "Supervisor did not shut down within 5s"),
+            }
+        }
+    }
 
     // Drop audit_tx to signal the writer to drain
     drop(audit_tx);
