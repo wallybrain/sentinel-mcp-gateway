@@ -124,6 +124,77 @@ impl StdioBackend {
     pub fn pid(&self) -> u32 {
         self.pid.load(Ordering::Relaxed)
     }
+
+    pub fn stdin_sender(&self) -> &mpsc::Sender<String> {
+        &self.stdin_tx
+    }
+}
+
+pub async fn discover_stdio_tools(backend: &StdioBackend) -> anyhow::Result<Vec<rmcp::model::Tool>> {
+    // Step 1: Send MCP initialize request
+    let init_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-03-26",
+            "capabilities": {},
+            "clientInfo": {
+                "name": "sentinel-gateway",
+                "version": "0.1.0"
+            }
+        }
+    });
+    let init_body = serde_json::to_string(&init_req)?;
+    let init_response = backend
+        .send(&init_body)
+        .await
+        .map_err(|e| anyhow::anyhow!("MCP initialize failed: {e}"))?;
+    tracing::debug!(backend = %backend.name(), response = %init_response, "MCP initialize response");
+
+    // Step 2: Send notifications/initialized (no id, no response expected)
+    let notif = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+    });
+    let notif_body = serde_json::to_string(&notif)?;
+    backend
+        .stdin_sender()
+        .send(notif_body)
+        .await
+        .map_err(|_| anyhow::anyhow!("failed to send notifications/initialized: stdin closed"))?;
+
+    // Step 3: Brief pause for server to process notification
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // Step 4: Send tools/list request
+    let list_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list"
+    });
+    let list_body = serde_json::to_string(&list_req)?;
+    let list_response = backend
+        .send(&list_body)
+        .await
+        .map_err(|e| anyhow::anyhow!("MCP tools/list failed: {e}"))?;
+    tracing::debug!(backend = %backend.name(), response = %list_response, "MCP tools/list response");
+
+    // Step 5: Parse tools from response
+    let parsed: serde_json::Value = serde_json::from_str(&list_response)?;
+    let tools_value = parsed
+        .get("result")
+        .and_then(|r| r.get("tools"))
+        .ok_or_else(|| anyhow::anyhow!("no tools in tools/list response"))?;
+
+    let tools: Vec<rmcp::model::Tool> = serde_json::from_value(tools_value.clone())?;
+    tracing::info!(
+        backend = %backend.name(),
+        count = tools.len(),
+        "discovered tools from stdio backend"
+    );
+
+    Ok(tools)
 }
 
 async fn stdin_writer(
