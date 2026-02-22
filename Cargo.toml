@@ -35,6 +35,7 @@ jsonschema = "0.42"
 tokio-test = "0.4"
 tower = { version = "0.5", features = ["util"] }
 tempfile = "3"
+http-body-util = "0.1"
 
 [profile.release]
 lto = "fat"
