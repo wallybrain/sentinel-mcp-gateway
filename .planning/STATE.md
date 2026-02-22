@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Every MCP tool call passes through one governed point with auth, audit, and rate limiting
-**Current focus:** Phase 12 complete, ready for Phase 13
+**Current focus:** Phase 15 (Cutover Gap Closure) — closing audit gaps before monitoring
 
 ## Current Position
 
-Phase: 12 of 14 (Network Hardening)
-Plan: 1 of 1 (complete)
-Status: Phase 12 complete
-Last activity: 2026-02-22 -- Phase 12 network hardening (session 7)
+Phase: 15 of 15 (Cutover Gap Closure)
+Plan: 0 of TBD (not yet planned)
+Status: Phase 15 not started — gap closure from v1.1 milestone audit
+Last activity: 2026-02-22 -- Milestone audit, gap closure phases created (session 8)
 
-Progress: [#########░] 86%
+Progress: [########░░] 80%
 
 ## Performance Metrics
 
@@ -83,9 +83,10 @@ Resume file: None
 - Removed stale mcp-context-forge_mcpnet Docker network (NET-04)
 
 ### Next steps:
-1. Phase 13: Monitoring Stack -- Prometheus, Grafana, Discord alerts
-2. Phase 14: Operations -- log rotation, backups, reboot resilience
-3. Optional: Remove ContextForge containers when confident in stability
+1. Phase 15: Plan and execute cutover gap closure (rollback test, Firecrawl key wiring, config hardening)
+2. Phase 13: Monitoring Stack -- Prometheus, Grafana, Discord alerts
+3. Phase 14: Operations -- log rotation, backups, reboot resilience
+4. Optional: Remove ContextForge containers when confident in stability
 
 ---
 *State initialized: 2026-02-22*
