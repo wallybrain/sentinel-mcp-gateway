@@ -89,7 +89,8 @@ async fn spawn_dispatch_with_caller(
     let (out_tx, out_rx) = mpsc::channel::<String>(64);
 
     tokio::spawn(async move {
-        let _ = run_dispatch(in_rx, out_tx, catalog, backends, id_remapper, caller, rbac).await;
+        let _ =
+            run_dispatch(in_rx, out_tx, catalog, backends, id_remapper, caller, rbac, None).await;
     });
 
     (in_tx, out_rx)
@@ -350,7 +351,7 @@ async fn test_tools_call_backend_not_in_map_returns_internal_error() {
     let (out_tx, mut out_rx) = mpsc::channel::<String>(64);
 
     tokio::spawn(async move {
-        let _ = run_dispatch(in_rx, out_tx, catalog, backends, id_remapper, None, rbac).await;
+        let _ = run_dispatch(in_rx, out_tx, catalog, backends, id_remapper, None, rbac, None).await;
     });
 
     // Handshake
@@ -551,4 +552,29 @@ async fn test_admin_denied_tool_override() {
     let resp = send_and_recv(&tx, &mut rx, &req).await;
     let error = resp.get("error").expect("should have error");
     assert_eq!(error["code"], -32003, "denied tool returns -32003 even for admin");
+}
+
+// --- Audit integration test ---
+
+#[tokio::test]
+async fn test_dispatch_accepts_none_audit_tx() {
+    // Smoke test: dispatch works correctly with audit_tx: None
+    let (tx, mut rx) = spawn_dispatch().await;
+    do_handshake(&tx, &mut rx).await;
+
+    // tools/call should work (hits backend error, not audit error)
+    let req = json!({
+        "jsonrpc": "2.0",
+        "id": 99,
+        "method": "tools/call",
+        "params": {"name": "read_query", "arguments": {"query": "SELECT 1"}}
+    })
+    .to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    // Should get INTERNAL_ERROR (no real backend), NOT a panic or audit-related error
+    let error = resp.get("error").expect("should have error");
+    assert_eq!(
+        error["code"], -32603,
+        "tools/call with None audit_tx should still work (backend unavailable)"
+    );
 }

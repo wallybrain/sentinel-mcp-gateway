@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use clap::Parser;
 use tokio::sync::mpsc;
 
+use sentinel_gateway::audit;
 use sentinel_gateway::auth::jwt::{CallerIdentity, JwtValidator};
 use sentinel_gateway::backend::{build_http_client, discover_tools, HttpBackend};
 use sentinel_gateway::config::types::BackendType;
@@ -120,6 +121,30 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
+    // Audit logging initialization
+    let audit_tx = if config.gateway.audit_enabled {
+        match std::env::var(&config.postgres.url_env) {
+            Ok(url) if !url.is_empty() => {
+                let pool = audit::db::create_pool(&url, config.postgres.max_connections).await?;
+                audit::db::run_migrations(&pool).await?;
+                let (atx, arx) = mpsc::channel::<audit::db::AuditEntry>(1024);
+                tokio::spawn(audit::writer::audit_writer(pool, arx));
+                tracing::info!("Audit logging enabled (Postgres)");
+                Some(atx)
+            }
+            _ => {
+                tracing::warn!(
+                    env_var = %config.postgres.url_env,
+                    "Postgres URL not set, audit logging disabled"
+                );
+                None
+            }
+        }
+    } else {
+        tracing::info!("Audit logging disabled");
+        None
+    };
+
     let (inbound_tx, inbound_rx) = mpsc::channel::<String>(64);
     let (outbound_tx, outbound_rx) = mpsc::channel::<String>(64);
 
@@ -134,6 +159,7 @@ async fn main() -> anyhow::Result<()> {
         &id_remapper,
         caller,
         &config.rbac,
+        audit_tx,
     )
     .await?;
 
