@@ -22,7 +22,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Routing
 
 - [x] **ROUTE-01**: Gateway routes `tools/call` requests to the correct HTTP backend based on tool name
-- [ ] **ROUTE-02**: Gateway routes `tools/call` requests to the correct stdio backend based on tool name
+- [x] **ROUTE-02**: Gateway routes `tools/call` requests to the correct stdio backend based on tool name
 - [x] **ROUTE-03**: Gateway handles connection pooling, keep-alive, and configurable timeouts for HTTP backends
 - [x] **ROUTE-04**: Gateway retries failed HTTP backend requests with exponential backoff and jitter
 
@@ -147,7 +147,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTHZ-02 | Phase 4 | Pending |
 | AUTHZ-03 | Phase 4 | Pending |
 | ROUTE-01 | Phase 3 | Complete |
-| ROUTE-02 | Phase 8 | Pending |
+| ROUTE-02 | Phase 8 | Complete |
 | ROUTE-03 | Phase 3 | Complete |
 | ROUTE-04 | Phase 3 | Complete |
 | STDIO-01 | Phase 8 | Pending |

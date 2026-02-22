@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 8 in progress -- supervisor + MCP handshake implemented (08-02 complete) |
+| Current Focus | Phase 8 COMPLETE -- stdio backends fully integrated as first-class citizens |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -13,9 +13,9 @@
 
 | Field | Value |
 |-------|-------|
-| Phase | 08-stdio-backend |
-| Plan | 03 |
-| Status | Phase 8 in progress (2/3 plans complete) |
+| Phase | 09-observability |
+| Plan | 01 |
+| Status | Phase 8 complete (3/3 plans), starting Phase 9 |
 
 **Overall Progress:**
 ```
@@ -26,7 +26,7 @@ Phase  4 [x] Authentication & Authorization (2/2 plans)
 Phase  5 [x] Audit Logging (2/2 plans)
 Phase  6 [x] Rate Limiting & Kill Switch (2/2 plans)
 Phase  7 [x] Health & Reliability (2/2 plans)
-Phase  8 [~] stdio Backend Management (2/3 plans)
+Phase  8 [x] stdio Backend Management (3/3 plans)
 Phase  9 [ ] Observability & Hot Reload
 Phase 10 [ ] Deployment & Integration
 ```
@@ -35,8 +35,8 @@ Phase 10 [ ] Deployment & Integration
 
 | Metric | Value |
 |--------|-------|
-| Phases completed | 7/10 |
-| Plans completed | 16/? |
+| Phases completed | 8/10 |
+| Plans completed | 17/? |
 | Requirements completed | 41/47 |
 | Session count | 7 |
 
@@ -56,6 +56,7 @@ Phase 10 [ ] Deployment & Integration
 | 07 | 02 | 17min | 2 | 6 |
 | 08 | 01 | 3min | 2 | 4 |
 | 08 | 02 | 12min | 2 | 2 |
+| 08 | 03 | 8min | 2 | 7 |
 
 ## Accumulated Context
 
@@ -107,6 +108,10 @@ Phase 10 [ ] Deployment & Integration
 - Restart counter resets after 60s healthy operation (transient crashes don't accumulate)
 - MCP handshake failure treated same as crash (kill child, backoff, restart)
 - Tools channel sends backend clone for catalog/map updates after handshake
+- Backend enum with Http/Stdio variants for unified dispatch (zero behavior change for HTTP)
+- CancellationToken created early for stdio supervisor access
+- 30s timeout for initial stdio backend tool discovery (supervisor retries in background)
+- 5s timeout for supervisor shutdown during ordered shutdown sequence
 
 ### Known Gotchas
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -122,16 +127,16 @@ Phase 10 [ ] Deployment & Integration
 - None
 
 ### TODOs
-- Execute Phase 8 plan 03 (gateway integration with Backend enum)
+- Execute Phase 9 (Observability & Hot Reload)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 08-02-PLAN.md -- supervisor with crash detection, exponential backoff, MCP handshake, 3 new tests (6 total)
-- **Stopped at:** Completed 08-02-PLAN.md (Phase 8: 2/3 plans)
-- **Next step:** Execute 08-03-PLAN.md (wire stdio into gateway dispatch with Backend enum)
+- **What happened:** Executed 08-03-PLAN.md -- Backend enum, gateway dispatch refactor, stdio startup in main.rs, 3 integration tests (125 total), Phase 8 COMPLETE
+- **Stopped at:** Completed 08-03-PLAN.md (Phase 8: 3/3 plans complete)
+- **Next step:** Execute Phase 9 (Observability & Hot Reload)
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22T06:51Z*
+*Last updated: 2026-02-22T07:02Z*
