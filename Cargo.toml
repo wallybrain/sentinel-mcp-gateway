@@ -21,7 +21,7 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 bytes = "1"
 futures = "0.3"
 rand = "0.9"
-jsonwebtoken = "10"
+jsonwebtoken = { version = "10", default-features = false, features = ["rust_crypto"] }
 
 [dev-dependencies]
 tokio-test = "0.4"
