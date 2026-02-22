@@ -4,12 +4,78 @@ use serde_json::{json, Value};
 use tokio::sync::mpsc;
 use tokio::time::{timeout, Duration};
 
+use sentinel_gateway::auth::jwt::CallerIdentity;
 use sentinel_gateway::backend::HttpBackend;
 use sentinel_gateway::catalog::create_stub_catalog;
+use sentinel_gateway::config::types::{RbacConfig, RoleConfig};
 use sentinel_gateway::gateway::run_dispatch;
 use sentinel_gateway::protocol::id_remapper::IdRemapper;
 
+fn default_admin_rbac() -> RbacConfig {
+    let mut roles = HashMap::new();
+    roles.insert(
+        "admin".to_string(),
+        RoleConfig {
+            permissions: vec!["*".to_string()],
+            denied_tools: vec![],
+        },
+    );
+    RbacConfig { roles }
+}
+
+fn make_test_rbac() -> RbacConfig {
+    let mut roles = HashMap::new();
+    roles.insert(
+        "admin".to_string(),
+        RoleConfig {
+            permissions: vec!["*".to_string()],
+            denied_tools: vec![],
+        },
+    );
+    roles.insert(
+        "developer".to_string(),
+        RoleConfig {
+            permissions: vec!["tools.read".to_string(), "tools.execute".to_string()],
+            denied_tools: vec!["write_query".to_string()],
+        },
+    );
+    roles.insert(
+        "viewer".to_string(),
+        RoleConfig {
+            permissions: vec!["tools.read".to_string()],
+            denied_tools: vec![],
+        },
+    );
+    roles.insert(
+        "admin_restricted".to_string(),
+        RoleConfig {
+            permissions: vec!["*".to_string()],
+            denied_tools: vec!["execute_workflow".to_string()],
+        },
+    );
+    RbacConfig { roles }
+}
+
+fn make_caller(role: &str) -> CallerIdentity {
+    CallerIdentity {
+        subject: format!("test-{role}"),
+        role: role.to_string(),
+        token_id: None,
+    }
+}
+
+/// Spawn dispatch with default admin (no auth) -- existing tests use this.
 async fn spawn_dispatch() -> (mpsc::Sender<String>, mpsc::Receiver<String>) {
+    let rbac = default_admin_rbac();
+    let rbac: &'static _ = Box::leak(Box::new(rbac));
+    spawn_dispatch_with_caller(None, rbac).await
+}
+
+/// Spawn dispatch with a specific caller and RBAC config.
+async fn spawn_dispatch_with_caller(
+    caller: Option<CallerIdentity>,
+    rbac: &'static RbacConfig,
+) -> (mpsc::Sender<String>, mpsc::Receiver<String>) {
     let catalog = create_stub_catalog();
     let catalog: &'static _ = Box::leak(Box::new(catalog));
 
@@ -23,7 +89,7 @@ async fn spawn_dispatch() -> (mpsc::Sender<String>, mpsc::Receiver<String>) {
     let (out_tx, out_rx) = mpsc::channel::<String>(64);
 
     tokio::spawn(async move {
-        let _ = run_dispatch(in_rx, out_tx, catalog, backends, id_remapper).await;
+        let _ = run_dispatch(in_rx, out_tx, catalog, backends, id_remapper, caller, rbac).await;
     });
 
     (in_tx, out_rx)
@@ -277,11 +343,14 @@ async fn test_tools_call_backend_not_in_map_returns_internal_error() {
     let id_remapper = IdRemapper::new();
     let id_remapper: &'static _ = Box::leak(Box::new(id_remapper));
 
+    let rbac = default_admin_rbac();
+    let rbac: &'static _ = Box::leak(Box::new(rbac));
+
     let (in_tx, in_rx) = mpsc::channel::<String>(64);
     let (out_tx, mut out_rx) = mpsc::channel::<String>(64);
 
     tokio::spawn(async move {
-        let _ = run_dispatch(in_rx, out_tx, catalog, backends, id_remapper).await;
+        let _ = run_dispatch(in_rx, out_tx, catalog, backends, id_remapper, None, rbac).await;
     });
 
     // Handshake
@@ -329,4 +398,157 @@ async fn test_id_remapper_round_trip() {
 
     // Second restore should return None (already consumed)
     assert!(remapper.restore(gateway_id).is_none());
+}
+
+// --- RBAC integration tests ---
+
+#[tokio::test]
+async fn test_viewer_sees_all_tools_in_list() {
+    let rbac: &'static _ = Box::leak(Box::new(make_test_rbac()));
+    let caller = make_caller("viewer");
+    let (tx, mut rx) = spawn_dispatch_with_caller(Some(caller), rbac).await;
+    do_handshake(&tx, &mut rx).await;
+
+    let req = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let tools = resp["result"]["tools"].as_array().expect("tools array");
+    assert_eq!(tools.len(), 4, "viewer with tools.read sees all 4 tools");
+}
+
+#[tokio::test]
+async fn test_viewer_cannot_call_tools() {
+    let rbac: &'static _ = Box::leak(Box::new(make_test_rbac()));
+    let caller = make_caller("viewer");
+    let (tx, mut rx) = spawn_dispatch_with_caller(Some(caller), rbac).await;
+    do_handshake(&tx, &mut rx).await;
+
+    let req = json!({
+        "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+        "params": {"name": "read_query", "arguments": {"query": "SELECT 1"}}
+    })
+    .to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let error = resp.get("error").expect("should have error");
+    assert_eq!(error["code"], -32003, "viewer cannot call tools");
+    assert!(error["message"].as_str().unwrap().contains("Permission denied"));
+}
+
+#[tokio::test]
+async fn test_developer_denied_tool_hidden_in_list() {
+    let rbac: &'static _ = Box::leak(Box::new(make_test_rbac()));
+    let caller = make_caller("developer");
+    let (tx, mut rx) = spawn_dispatch_with_caller(Some(caller), rbac).await;
+    do_handshake(&tx, &mut rx).await;
+
+    let req = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let tools = resp["result"]["tools"].as_array().expect("tools array");
+    let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
+    assert!(!names.contains(&"write_query"), "denied tool hidden from list");
+    assert_eq!(tools.len(), 3, "developer sees 3 tools (write_query denied)");
+}
+
+#[tokio::test]
+async fn test_developer_denied_tool_blocked_in_call() {
+    let rbac: &'static _ = Box::leak(Box::new(make_test_rbac()));
+    let caller = make_caller("developer");
+    let (tx, mut rx) = spawn_dispatch_with_caller(Some(caller), rbac).await;
+    do_handshake(&tx, &mut rx).await;
+
+    let req = json!({
+        "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+        "params": {"name": "write_query", "arguments": {"query": "DROP TABLE x"}}
+    })
+    .to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let error = resp.get("error").expect("should have error");
+    assert_eq!(error["code"], -32003, "denied tool returns -32003");
+}
+
+#[tokio::test]
+async fn test_developer_can_call_allowed_tool() {
+    let rbac: &'static _ = Box::leak(Box::new(make_test_rbac()));
+    let caller = make_caller("developer");
+    let (tx, mut rx) = spawn_dispatch_with_caller(Some(caller), rbac).await;
+    do_handshake(&tx, &mut rx).await;
+
+    let req = json!({
+        "jsonrpc": "2.0", "id": 3, "method": "tools/call",
+        "params": {"name": "read_query", "arguments": {"query": "SELECT 1"}}
+    })
+    .to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    // Should NOT be -32003 (passes RBAC, then hits backend error since no real backend)
+    let error = resp.get("error");
+    if let Some(err) = error {
+        assert_ne!(err["code"], -32003, "allowed tool should not get AUTHZ error");
+    }
+}
+
+#[tokio::test]
+async fn test_unknown_role_sees_no_tools() {
+    let rbac: &'static _ = Box::leak(Box::new(make_test_rbac()));
+    let caller = make_caller("intern");
+    let (tx, mut rx) = spawn_dispatch_with_caller(Some(caller), rbac).await;
+    do_handshake(&tx, &mut rx).await;
+
+    let req = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let tools = resp["result"]["tools"].as_array().expect("tools array");
+    assert_eq!(tools.len(), 0, "unknown role sees empty catalog");
+}
+
+#[tokio::test]
+async fn test_unknown_role_cannot_call() {
+    let rbac: &'static _ = Box::leak(Box::new(make_test_rbac()));
+    let caller = make_caller("intern");
+    let (tx, mut rx) = spawn_dispatch_with_caller(Some(caller), rbac).await;
+    do_handshake(&tx, &mut rx).await;
+
+    let req = json!({
+        "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+        "params": {"name": "read_query", "arguments": {}}
+    })
+    .to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let error = resp.get("error").expect("should have error");
+    assert_eq!(error["code"], -32003, "unknown role gets -32003");
+}
+
+#[tokio::test]
+async fn test_admin_wildcard_sees_all_tools() {
+    let rbac: &'static _ = Box::leak(Box::new(make_test_rbac()));
+    let caller = make_caller("admin");
+    let (tx, mut rx) = spawn_dispatch_with_caller(Some(caller), rbac).await;
+    do_handshake(&tx, &mut rx).await;
+
+    let req = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let tools = resp["result"]["tools"].as_array().expect("tools array");
+    assert_eq!(tools.len(), 4, "admin with wildcard sees all 4 tools");
+}
+
+#[tokio::test]
+async fn test_admin_denied_tool_override() {
+    let rbac: &'static _ = Box::leak(Box::new(make_test_rbac()));
+    let caller = make_caller("admin_restricted");
+    let (tx, mut rx) = spawn_dispatch_with_caller(Some(caller), rbac).await;
+    do_handshake(&tx, &mut rx).await;
+
+    // Check tools/list excludes denied tool
+    let req = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}).to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let tools = resp["result"]["tools"].as_array().expect("tools array");
+    let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
+    assert!(!names.contains(&"execute_workflow"), "denied tool hidden even for admin");
+
+    // Check tools/call blocked
+    let req = json!({
+        "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+        "params": {"name": "execute_workflow", "arguments": {}}
+    })
+    .to_string();
+    let resp = send_and_recv(&tx, &mut rx, &req).await;
+    let error = resp.get("error").expect("should have error");
+    assert_eq!(error["code"], -32003, "denied tool returns -32003 even for admin");
 }
