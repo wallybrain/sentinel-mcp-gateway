@@ -1,155 +1,196 @@
-# Feature Landscape
+# Feature Research
 
-**Domain:** MCP Gateway (Model Context Protocol routing, auth, and governance)
+**Domain:** Production deployment, monitoring, and hardening for an MCP gateway (Rust/Docker)
 **Researched:** 2026-02-22
-**Overall confidence:** HIGH (based on whitepaper, ContextForge reference, and 17+ open-source gateways surveyed)
+**Confidence:** HIGH
 
-## Table Stakes
+**Scope note:** This research covers v1.1 (Deploy & Harden) features only. For v1.0 gateway features (auth, RBAC, routing, audit, etc.), see git history of this file.
 
-Features users expect from any MCP gateway. Missing any of these and it is not a gateway -- it is a proxy at best.
+## Feature Landscape
 
-| # | Feature | Why Expected | Complexity | Notes |
-|---|---------|--------------|------------|-------|
-| 1 | **JWT Authentication** | Every request must prove identity. The whitepaper lists identity brokering as minimum responsibility #1. Every gateway in the ecosystem implements auth. | Medium | HS256 validation, exp/iss/aud/jti checks. ContextForge uses this exact scheme. |
-| 2 | **RBAC (per-tool, per-role)** | Without authorization, auth is pointless. Whitepaper minimum #5. Even single-user deployments need role separation for future growth. | Medium | Token claims map to roles, roles map to tool permissions. TOML config, not OPA. |
-| 3 | **Request Routing** | The core gateway function: match tool names to backend servers. Without routing, there is no gateway. Whitepaper minimum #3. | Medium | Route table mapping tool name patterns to HTTP backends or stdio processes. |
-| 4 | **Tool Discovery (catalog aggregation)** | Clients call `tools/list` and expect one unified catalog. Whitepaper minimum #2. ContextForge's virtual server concept does exactly this. | Medium | Merge `tools/list` responses from all backends, deduplicate, serve as one catalog. |
-| 5 | **Rate Limiting** | Prevent runaway agents from hammering backends. Whitepaper minimum #4. Token bucket per-client, per-tool. | Medium | In-memory token bucket with configurable rates per tool. No Redis needed for single-node. |
-| 6 | **Audit Logging** | Who called what, when, with what arguments, what happened. Whitepaper minimum #6. Non-negotiable for enterprise and useful for debugging at any scale. | Medium | Structured JSON logs to Postgres. Fields: timestamp, client, tool, args (redacted), status, latency. |
-| 7 | **Health Checks** | `/health` and `/ready` endpoints plus periodic backend pings. Whitepaper minimum #3 (availability monitoring). Docker and orchestrators depend on this. | Low | Liveness (gateway up) and readiness (backends reachable). Backend ping on configurable interval. |
-| 8 | **Kill Switch** | Disable individual tools or entire backends without restarting. Whitepaper minimum #7. Emergency response capability. | Low | Config flag per tool/backend. Check on every request. Hot-reloadable via SIGHUP or file watch. |
-| 9 | **JSON-RPC 2.0 Compliance** | MCP IS JSON-RPC 2.0. Non-compliance means non-functional. Request/response correlation, error codes, batch support. | Medium | Must handle: id correlation, method dispatch, error objects, notification (no id). |
-| 10 | **Dual Transport: stdio upstream + Streamable HTTP downstream** | Claude Code connects via stdio. HTTP backends speak Streamable HTTP. Gateway must bridge both. This is THE core MCP topology. | High | stdio: newline-delimited JSON-RPC on stdin/stdout. HTTP: POST with JSON body, SSE response stream. |
-| 11 | **SSE Streaming** | Backends return `text/event-stream` for long-running tool calls. Gateway must proxy these without buffering. Dropping SSE = breaking streaming tools. | Medium | Proxy SSE events from backend to client without buffering entire response. |
-| 12 | **Connection Management** | Keep-alive, timeouts, retries with exponential backoff and jitter. Without this, transient failures cascade. Whitepaper lists this under scalability. | Medium | Per-backend configurable timeout, max retries, backoff factor. Connection pooling via reqwest. |
-| 13 | **Graceful Shutdown** | Handle SIGTERM: drain in-flight requests, close stdio children, flush audit logs, then exit. Ungraceful shutdown = lost audit data and orphaned processes. | Low | Signal handler, shutdown timeout, ordered teardown. |
-| 14 | **TOML Configuration** | Backends, roles, rate limits, kill switches all in config. No hardcoded values. Whitepaper calls for externalized configuration. | Low | Single `sentinel.toml` with sections for auth, backends, roles, limits. |
+### Table Stakes (Users Expect These)
 
-## Differentiators
+Features that are non-negotiable for a production deployment cutover. Missing any of these means the deployment is incomplete or fragile.
 
-Features that set Sentinel apart from ContextForge and other MCP gateways. Not expected but valued.
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| Clean ContextForge-to-Sentinel cutover | Entire purpose of v1.1 -- replace predecessor | LOW | Stop ContextForge containers, start Sentinel, update MCP config. Sentinel already listens on 9200 per `sentinel.toml`. Same port means sequential swap, not parallel. ~5s downtime, acceptable for single user. |
+| Claude MCP config update | Claude Code must route through Sentinel not ContextForge | LOW | Update `~/.claude/settings.json` MCP server entry. Point at `127.0.0.1:9200`. Generate new JWT for Sentinel auth. Token currently at `/tmp/claude-1001/gateway-token.txt`. |
+| End-to-end tool verification | Must confirm all 7 backends work through Sentinel | LOW | Call one tool per backend (n8n, sqlite, context7, firecrawl, exa, playwright, sequential-thinking), verify JSON-RPC response matches ContextForge behavior. 138 tests passed in dev but need live verification with real backends and real API keys. |
+| 127.0.0.1 binding verification | Gateway must not be reachable from public internet | LOW | Already configured: `sentinel.toml` has `listen = "127.0.0.1:9200"`, `docker-compose.yml` maps `127.0.0.1:9201:9201`. Verify with `curl` from external IP returns connection refused. |
+| iptables rules for Sentinel ports | Defense-in-depth even though bound to localhost | LOW | Match existing VPS pattern: `iptables -A INPUT -i eth0 -p tcp --dport 9200 -j DROP` and same for 9201. Add to `/home/lwb3/v1be-code-server/fix-iptables.sh`. |
+| Docker health checks | Container orchestration must detect if Sentinel is alive | ALREADY DONE | `docker-compose.yml` already has health check curling `/health` on 9201. Postgres has `pg_isready`. Both verified in v1.0. |
+| Prometheus scrape config | Prometheus must pull metrics from `/metrics` endpoint | LOW | Add `prometheus.yml` job targeting `sentinel-gateway:9201`. Sentinel exposes 5 metric families: `sentinel_requests_total`, `sentinel_request_duration_seconds`, `sentinel_errors_total`, `sentinel_backend_healthy`, `sentinel_rate_limit_hits_total`. |
+| Grafana dashboard for Sentinel metrics | Visibility into gateway operations | MEDIUM | JSON dashboard provisioned via `/etc/grafana/provisioning/dashboards/`. Five panels: request rate (by tool/status), latency percentiles (p50/p95/p99), error rate, backend health gauge, rate limit hits. |
+| Grafana datasource provisioning | Grafana must auto-connect to Prometheus on startup | LOW | YAML in `/etc/grafana/provisioning/datasources/` pointing at `http://prometheus:9090`. Standard pattern, well-documented. |
+| n8n health monitoring with Discord alerts | Automated alerting when Sentinel goes down | MEDIUM | n8n Schedule trigger every 5 min, HTTP Request to `http://sentinel-gateway:9201/health`. On non-200 or timeout, Discord webhook with red embed. Existing pattern proven: VPS has heartbeat workflow `zC3ZEX1gtzZr3m62` to clone from. |
+| Discord alert on failure | Operator must be notified when gateway is unhealthy | LOW | Discord webhook POST with embed. Already using webhooks for daily health heartbeat and security reminders. Webhook URL already configured in n8n. |
+| Rollback plan documented | Must be able to revert to ContextForge if Sentinel fails | LOW | Steps: stop Sentinel containers, restart ContextForge (`docker compose -f docker-compose.yml -f docker-compose.slim.yml up -d`), revert MCP config. ContextForge images and pgdata volume preserved during cutover. |
 
-| # | Feature | Value Proposition | Complexity | Notes |
-|---|---------|-------------------|------------|-------|
-| 1 | **stdio Backend Management** | No other gateway governs stdio MCP servers (context7, firecrawl, exa, playwright, sequential-thinking). ContextForge only routes to HTTP backends. This is the single biggest differentiator -- bringing ALL MCP traffic under one governed chokepoint. | High | Spawn child processes, manage lifecycle (restart on crash), multiplex JSON-RPC over stdin/stdout, aggregate into unified catalog. The hardest feature in the gateway. |
-| 2 | **Single Binary Deployment** | Rust compiles to one static binary. No Python runtime, no pip, no virtualenv, no gunicorn. ContextForge needs Python 3.11+, FastAPI, Gunicorn, and 40+ pip packages. `cargo build --release` produces a ~10-20 MB binary. | Free (Rust) | Massively reduces deployment complexity and attack surface. Ship one file. |
-| 3 | **Minimal Resource Footprint** | Target: <50 MB RAM vs ContextForge's 512 MB limit (plus 512 MB Postgres, 192 MB Redis = 1.2 GB total). Sentinel targets <100 MB total (gateway + embedded state). Eliminates Redis entirely. | Medium | Rust async runtime (tokio) is inherently efficient. No GC pauses. No Redis needed for single-node rate limiting. |
-| 4 | **Hot Config Reload** | Change TOML config, send SIGHUP (or file-watch detects change), gateway picks up new roles/limits/kill-switches without restart. Zero downtime config changes. | Medium | Watch config file or handle SIGHUP. Re-parse TOML, swap Arc'd config atomically. Existing connections unaffected. |
-| 5 | **Circuit Breaker per Backend** | When a backend fails N times, stop sending requests for a cooldown period. Prevents cascading failures. Standard in API gateways (Kong, Envoy) but absent from most MCP gateways. | Medium | Per-backend state machine: Closed -> Open (after N failures) -> Half-Open (probe) -> Closed. |
-| 6 | **Input Validation** | Validate tool call arguments against the tool's JSON schema before forwarding. Reject malformed requests at the gateway. Whitepaper lists this under security foundations. | Medium | Cache tool schemas from `tools/list`, validate `arguments` on `tools/call`. Return JSON-RPC error for invalid input. |
-| 7 | **Prometheus Metrics Endpoint** | `/metrics` with request counts, latencies, error rates, backend health, rate limit hits. Standard observability that ContextForge buries in its Postgres DB. | Low | Use prometheus-client crate. Counters and histograms for key operations. |
-| 8 | **Request ID Correlation** | Generate a unique request ID for each tool call, propagate through audit logs, backend requests, and response headers. Enables end-to-end tracing without OpenTelemetry. | Low | UUID per request, attached to all log entries and passed as header to backends. |
-| 9 | **CLI Management Tool** | `sentinel-cli status`, `sentinel-cli tools`, `sentinel-cli kill <tool>`, `sentinel-cli token generate`. No web UI needed -- config files + CLI cover all management. | Medium | Separate binary or subcommand that talks to gateway's admin API (or reads config directly). |
+### Differentiators (Competitive Advantage)
 
-## Anti-Features
+Features beyond table stakes that add meaningful operational value.
 
-Features to explicitly NOT build in v1. These add complexity without value at current scale, or are better solved elsewhere.
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Grafana alert rules with Discord | Catches metric anomalies that n8n health check misses (error rate spike while `/health` still returns 200) | MEDIUM | Grafana alerting with Discord contact point. Rules: error rate > 10% over 5 min, p99 latency > 30s, any backend unhealthy > 2 min. Independent alert path from n8n. |
+| Audit log rotation | Prevent unbounded Postgres disk growth from audit logs | LOW | Cron job or n8n workflow: `DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '30 days'`. Alternatively Postgres table partitioning by month. |
+| VPS reboot restart verification | Confirm containers survive reboot | LOW | `restart: unless-stopped` already set. Need to test once after cutover is stable. |
+| Sentinel resource tracking (cAdvisor) | Track if Sentinel stays under 100 MB RAM target over time | LOW | cAdvisor container or Docker stats exporter alongside Prometheus. Shows RSS, CPU usage trends. |
+| Nightly Postgres backup for Sentinel DB | Protect audit log data | LOW | Extend existing `/home/lwb3/backups/nightly-db-backup.sh` to include `pg_dump` of sentinel database, or backup the pgdata Docker volume. |
 
-| # | Anti-Feature | Why Avoid | What to Do Instead |
-|---|--------------|-----------|-------------------|
-| 1 | **OAuth 2.1 (full spec)** | OAuth adds PKCE, token refresh, authorization server, client registration -- massive complexity for a single-user VPS. JWT is sufficient and proven (ContextForge uses it). The whitepaper says "OAuth per MCP spec" but that is enterprise scope. | JWT with HS256. Add OAuth in v2 if multi-user demand materializes. |
-| 2 | **Web Admin UI** | ContextForge has one; we never use it. Config files + CLI are faster for a single operator. UI adds a frontend framework, build pipeline, session management, and XSS surface. | TOML config + CLI tool. The config file IS the admin interface. |
-| 3 | **Plugin System** | ContextForge has 40+ plugins; we use zero. Plugins need a runtime, API surface, versioning, security sandboxing. Build the right features into core instead. | Hard-code the features that matter. Extensibility is a v2 concern. |
-| 4 | **Multi-tenancy** | Single user on a VPS. Tenant isolation needs separate configs, separate rate limits, separate audit trails, separate catalogs. Enormous complexity for zero current users. | Single-tenant with clean boundaries so multi-tenancy CAN be added later. |
-| 5 | **OPA Policy Engine** | Policy-as-code (Rego) is powerful but overkill. Simple TOML allow/deny rules cover "can role X call tool Y?" without learning a policy language or running a sidecar. | TOML-based role-to-tool mappings. If rules get complex enough to need OPA, add it. |
-| 6 | **mTLS Between Gateway and Backends** | All traffic is localhost or Docker network. TLS adds certificate management, rotation, and debugging pain for zero security benefit on a local network. | Plain HTTP internally. Add mTLS in v2 if gateway and backends are ever on separate hosts. |
-| 7 | **A2A Protocol Support** | Agent-to-Agent is a separate concern from tool governance. The whitepaper mentions it but as a future pattern. No current A2A clients exist in this infrastructure. | Focus on MCP. Revisit A2A when agent orchestration is a real need. |
-| 8 | **Caching Layer** | Tool calls are mostly write operations (execute workflow, run query) or unique reads (query with different params). Caching adds staleness risk and invalidation complexity. | No caching. If specific tools benefit from caching later, add per-tool cache config. |
-| 9 | **OpenTelemetry / Distributed Tracing** | Structured logs to Postgres + Prometheus metrics + request ID correlation cover observability needs. OTel adds a collector, exporter config, and span management overhead. | Structured audit logs + `/metrics` + request IDs. Add OTel in v2 if log correlation proves insufficient. |
-| 10 | **LLM Provider Proxying** | ContextForge can proxy OpenAI-compatible LLM calls. That is a different product (AI gateway, not MCP gateway). Mixing concerns dilutes focus. | Sentinel is an MCP gateway. LLM routing belongs in a separate layer. |
-| 11 | **REST-to-MCP Conversion** | ContextForge converts arbitrary REST APIs to MCP tools. Useful but complex (schema inference, error mapping, pagination). Backend MCP servers already handle this. | Backends expose MCP natively. If a REST API needs MCP wrapping, write a thin MCP server for it. |
-| 12 | **Blue/Green or Canary Deployments** | Single instance, Docker restart is fine. Deployment strategies add routing complexity, health check sophistication, and state management. | `docker compose up -d --build` with graceful shutdown. Rolling deploys in v2. |
-| 13 | **Model/Schema Versioning** | Tool schemas come from backends. Gateway should not version-manage them -- that is the backend's responsibility. | Pass through backend schemas as-is. Pin backend versions in Docker Compose. |
+### Anti-Features (Commonly Requested, Often Problematic)
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Blue/green deployment | Zero-downtime cutover | Overkill for single-user localhost gateway. Needs reverse proxy, port juggling, permanent infrastructure. Downtime is ~5s affecting one user. Already in project out-of-scope. | Sequential swap: stop old, start new. Keep ContextForge images for rollback. |
+| Prometheus Alertmanager | Standard Prometheus alerting | Another container, config file, routing tree, deduplication. Single operator with Discord does not need this. | Grafana alert rules with Discord contact point + n8n health check. Two independent paths without Alertmanager overhead. |
+| Loki log aggregation | Centralized log search | Sentinel logs structured JSON to stdout (Docker captures). `docker logs` + Postgres audit covers needs. Loki adds 500+ MB RAM for marginal benefit. | `docker logs --since 1h sentinel-gateway` for debugging. Postgres audit for tool call history. |
+| OpenTelemetry tracing | Distributed tracing | Single-hop architecture (gateway to backend). No multi-service correlation needed. Already out-of-scope. Adds 2-3 containers. | Prometheus metrics for latency. Postgres audit for per-request detail. Request IDs in logs. |
+| Automated rollback on failure | Self-healing if Sentinel fails | Dangerous: incorrect health check = thrashing between services. ContextForge and Sentinel have different configs/secrets. Automatic switching could corrupt state. | Manual rollback with documented steps. Discord alert provides time to investigate. |
+| Nginx reverse proxy | Standard production pattern | Sentinel is localhost-only, one client (Claude Code via stdio). No TLS, no load balancing, no caching benefit. Adds latency and failure point. | Direct connection. Axum handles the single client. |
+| 20+ panel monitoring dashboard | Complete observability | 5 metric families means 5 panels. More panels = noise. Focus on actionable panels. | Focused: request rate, error rate, latency histogram, backend health, rate limit hits. |
+| Parallel run (Sentinel + ContextForge) | Compare behavior side-by-side | Both bind to 9200. Would need port change, dual config, dual JWT. 138 tests + 47 requirements already verified compatibility. | Sequential cutover with rollback plan. Verify tools end-to-end after swap. |
 
 ## Feature Dependencies
 
 ```
-                    JWT Authentication
-                          |
-                          v
-                    RBAC (per-tool)
-                          |
-                    +-----+-----+
-                    |           |
-                    v           v
-             Request Routing   Kill Switch
-                    |
-          +---------+---------+
-          |                   |
-          v                   v
-   HTTP Backend          stdio Backend
-   Routing               Management
-          |                   |
-          +--------+----------+
-                   |
-                   v
-          Tool Discovery
-          (catalog merge)
-                   |
-          +--------+--------+
-          |        |        |
-          v        v        v
-    Rate        Audit     Circuit
-    Limiting    Logging   Breaker
-                   |
-                   v
-            Input Validation
-            (needs tool schemas)
+[Sentinel containers up + healthy]
+    |
+    +--requires--> [docker-compose.yml with .env secrets]
+    +--requires--> [Postgres healthy + migrations applied]
+    |
+    v
+[ContextForge shutdown]
+    +--requires--> [Sentinel containers verified healthy]
+    |
+    v
+[Claude MCP config update + JWT]
+    +--requires--> [Sentinel listening on 9200]
+    |
+    v
+[End-to-end tool verification]
+    +--requires--> [Claude MCP config pointing at Sentinel]
+    +--requires--> [All 7 backends reachable from Sentinel container]
+    |
+    v
+[CUTOVER COMPLETE -- monitoring can begin]
+    |
+    +------+------+------+
+    |      |      |      |
+    v      v      v      v
+[Prom] [Grafana] [n8n]  [iptables]
+   |      |       |
+   v      v       v
+[scrape] [dash]  [Discord alert]
+   |      |
+   +--+---+
+      |
+      v
+   [Grafana alerting]
 ```
 
-Key dependency chains:
-- **Auth before RBAC** -- cannot check permissions without identity
-- **Routing before Discovery** -- cannot aggregate catalogs without reaching backends
-- **Discovery before Validation** -- cannot validate args without tool schemas
-- **stdio Management is independent of HTTP routing** -- can be built in parallel but both feed into Discovery
-- **Health Checks independent** -- can exist before any routing works
+### Dependency Notes
 
-## MVP Recommendation
+- **Cutover is the critical path.** Everything else depends on Sentinel running. Do cutover first, layer monitoring on top.
+- **Monitoring has two independent tracks.** Prometheus/Grafana (metrics visualization) and n8n (health polling + Discord). Can be built in parallel after cutover.
+- **iptables is independent.** Can be hardened at any point. Good to do early to prevent accidental exposure.
+- **Grafana alerting depends on both Prometheus and Grafana.** Add after dashboard confirms metrics flow correctly.
+- **n8n health check is the fastest path to alerting.** Does not need Prometheus/Grafana at all. Can work immediately after cutover.
 
-**Phase 1 -- Foundation (get requests flowing):**
-1. TOML configuration system
-2. JWT authentication
-3. RBAC (role-to-tool mapping)
-4. HTTP backend routing (n8n, sqlite -- match ContextForge behavior)
-5. Tool discovery (aggregate `tools/list` from HTTP backends)
-6. Health check endpoints
+## MVP Definition
 
-**Phase 2 -- Governance (make it production-worthy):**
-1. Audit logging to Postgres
-2. Rate limiting (in-memory token bucket)
-3. Kill switch (per-tool, per-backend)
-4. SSE streaming passthrough
-5. Connection management (timeouts, retries, backoff)
-6. Graceful shutdown
+### Launch With (v1.1 core -- cutover + minimum monitoring)
 
-**Phase 3 -- stdio (the differentiator):**
-1. stdio backend management (spawn, lifecycle, restart)
-2. stdio JSON-RPC multiplexing
-3. Unified catalog (HTTP + stdio backends merged)
-4. Circuit breaker per backend
+- [ ] Start Sentinel containers on VPS (`docker compose up -d` with production .env)
+- [ ] Stop ContextForge containers (preserve images/volumes for rollback)
+- [ ] Update Claude MCP config to point at Sentinel on 9200
+- [ ] Generate JWT token for Sentinel auth
+- [ ] Verify all 7 backends work end-to-end
+- [ ] Verify 127.0.0.1 binding (not reachable from public IP)
+- [ ] Add iptables DROP rules for 9200/9201 on eth0, update `fix-iptables.sh`
+- [ ] n8n health check workflow: poll `/health` every 5 min, Discord alert on failure
+- [ ] Prometheus container scraping Sentinel `/metrics`
+- [ ] Grafana container with provisioned datasource and 5-panel dashboard
+- [ ] Rollback plan documented
 
-**Phase 4 -- Polish (operational excellence):**
-1. Hot config reload (SIGHUP)
-2. Input validation against tool schemas
-3. Prometheus metrics endpoint
-4. Request ID correlation
-5. CLI management tool
+### Add After Validation (v1.1 polish -- after stable for 24h)
 
-**Rationale:** Phase 1 produces a drop-in replacement for ContextForge's core routing. Phase 2 adds the governance that makes it enterprise-grade. Phase 3 is the unique value -- no other gateway governs stdio servers. Phase 4 is operational polish that makes it pleasant to run.
+- [ ] Grafana alert rules (error rate, latency, backend health) with Discord contact point
+- [ ] Audit log rotation (30-day retention)
+- [ ] VPS reboot restart verification
+- [ ] Extend nightly backup script for Sentinel Postgres
 
-**Defer:** Everything in the anti-features list. If any become needed, they are v2 scope.
+### Future Consideration (v2+)
+
+- [ ] OpenTelemetry tracing -- only if multi-hop routing added
+- [ ] Alertmanager -- only if alert routing complexity exceeds Grafana rules
+- [ ] Loki -- only if `docker logs` proves insufficient
+- [ ] cAdvisor resource monitoring -- only if resource usage becomes a concern
+
+## Feature Prioritization Matrix
+
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| Clean cutover (stop CF, start Sentinel) | HIGH | LOW | P1 |
+| Claude MCP config update + JWT | HIGH | LOW | P1 |
+| End-to-end tool verification | HIGH | LOW | P1 |
+| 127.0.0.1 binding verification | HIGH | LOW | P1 |
+| iptables hardening | HIGH | LOW | P1 |
+| Rollback plan documented | HIGH | LOW | P1 |
+| n8n health check + Discord alert | HIGH | MEDIUM | P1 |
+| Prometheus scrape config | MEDIUM | LOW | P1 |
+| Grafana datasource provisioning | MEDIUM | LOW | P1 |
+| Grafana dashboard (5 panels) | MEDIUM | MEDIUM | P1 |
+| Grafana alert rules + Discord | MEDIUM | MEDIUM | P2 |
+| Audit log rotation | MEDIUM | LOW | P2 |
+| Nightly Postgres backup | MEDIUM | LOW | P2 |
+| VPS reboot restart test | LOW | LOW | P2 |
+| cAdvisor resource monitoring | LOW | LOW | P3 |
+
+**Priority key:**
+- P1: Must have for v1.1 launch
+- P2: Should have, add after P1 stable (24h)
+- P3: Nice to have, future consideration
+
+## Existing Infrastructure to Leverage
+
+| Existing Asset | How It Helps | Location |
+|----------------|-------------|----------|
+| n8n health heartbeat workflow | Clone and modify for Sentinel health check | Workflow `zC3ZEX1gtzZr3m62` |
+| Discord webhook | Already configured in n8n for alerts | n8n credentials |
+| `fix-iptables.sh` | Add Sentinel ports to existing script | `/home/lwb3/v1be-code-server/fix-iptables.sh` |
+| Docker log rotation | Global config, Sentinel inherits automatically | `/etc/docker/daemon.json` (10m, 3 files) |
+| Nightly backup script | Extend for Sentinel Postgres | `/home/lwb3/backups/nightly-db-backup.sh` |
+| Global pre-commit hook | Prevents committing .env with secrets | `~/.git-hooks/pre-commit` |
+| ContextForge monitoring profile | Reference for Prometheus/Grafana compose pattern | `/home/lwb3/mcp-context-forge/docker-compose.yml` |
+| JWT token generation | Pattern established for ContextForge | Token at `/tmp/claude-1001/gateway-token.txt` |
+
+## Prometheus Metrics Already Available
+
+Sentinel v1.0 exposes 5 metric families at `/metrics` on port 9201. No additional instrumentation needed.
+
+| Metric | Type | Labels | Dashboard Panel |
+|--------|------|--------|-----------------|
+| `sentinel_requests_total` | Counter | `tool`, `status` | Request rate by tool, success/error split |
+| `sentinel_request_duration_seconds` | Histogram | `tool` | Latency percentiles (p50, p95, p99) |
+| `sentinel_errors_total` | Counter | `tool`, `error_type` | Error rate by type |
+| `sentinel_backend_healthy` | Gauge | `backend` | Backend health (1=up, 0=down, per backend) |
+| `sentinel_rate_limit_hits_total` | Counter | `tool` | Rate limit hit frequency |
 
 ## Sources
 
-- IBM/Anthropic whitepaper "Architecting Secure Enterprise AI Agents with MCP" (Oct 2025), pp. 14-18
-- [IBM ContextForge documentation](https://ibm.github.io/mcp-context-forge/)
-- [ContextForge GitHub](https://github.com/IBM/mcp-context-forge)
-- [Awesome MCP Gateways](https://github.com/e2b-dev/awesome-mcp-gateways) -- 17 open-source + 21 commercial gateways catalogued
-- [MCP Architecture Overview](https://modelcontextprotocol.io/docs/learn/architecture)
-- [Best MCP Gateways for Platform Engineering 2026](https://www.mintmcp.com/blog/mcp-gateways-platform-engineering-teams)
-- [MintMCP vs IBM ContextForge](https://www.mintmcp.com/blog/mintmcp-vs-ibm-contextforge-comparison)
-- [Why MCP Needs a Gateway](https://bytebridge.medium.com/why-mcp-needs-a-gateway-turning-model-context-protocol-integrations-into-production-grade-agent-88f80f390f49)
-- [MCP Timeout and Retry Strategies](https://octopus.com/blog/mcp-timeout-retry)
-- [Avoid stdio! MCP Servers In Enterprise Should Be Remote](https://blog.christianposta.com/mcp-should-be-remote/)
-- ContextForge deployment at `/home/lwb3/mcp-context-forge/` (live reference implementation)
-- MCP Topology analysis at `/home/lwb3/sentinel-gateway/docs/MCP-TOPOLOGY.md`
+- [Grafana provisioning documentation](https://grafana.com/docs/grafana/latest/administration/provisioning/)
+- [Grafana Prometheus datasource configuration](https://grafana.com/docs/grafana/latest/datasources/prometheus/configure/)
+- [Prometheus with Docker Compose setup guide](https://last9.io/blog/prometheus-with-docker-compose/)
+- [Grafana + Prometheus Docker Compose tutorial](https://www.doc.ic.ac.uk/~nuric/posts/sysadmin/how-to-setup-grafana-and-prometheus-with-docker-compose/)
+- [n8n health monitoring workflow template](https://n8n.io/workflows/8412-website-and-api-health-monitoring-system-with-http-status-validation/)
+- [n8n monitoring documentation](https://docs.n8n.io/hosting/logging-monitoring/monitoring/)
+- [Docker-rollout zero-downtime deployment](https://github.com/wowu/docker-rollout) (reviewed, decided against -- overkill)
+- Sentinel Gateway source: `src/metrics/mod.rs`, `src/health/server.rs`
+- ContextForge compose: `/home/lwb3/mcp-context-forge/docker-compose.yml` (monitoring profile reference)
+- VPS infrastructure: MEMORY.md (containers, iptables, n8n workflows, backups)
+
+---
+*Feature research for: Sentinel Gateway v1.1 Deploy & Harden*
+*Researched: 2026-02-22*

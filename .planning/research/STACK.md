@@ -1,284 +1,272 @@
 # Technology Stack
 
-**Project:** Sentinel Gateway (Rust MCP Gateway)
+**Project:** Sentinel Gateway v1.1 -- Deploy, Monitor & Harden
 **Researched:** 2026-02-22
+**Scope:** Stack additions for deployment, Prometheus/Grafana monitoring, n8n health checks, Docker networking cutover. Does NOT revisit v1.0 core stack (Rust, axum, tokio, sqlx, etc.).
 
-## Recommended Stack
+## Recommended Stack Additions
 
-### Async Runtime
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| tokio | 1.47.x (LTS) | Async runtime | Industry standard. LTS until Sept 2026. All ecosystem crates (axum, reqwest, sqlx) build on tokio. Use LTS over bleeding-edge 1.49 for stability. | HIGH |
-| tokio-util | 0.7.x | Codec, stream utilities | Needed for stdio line framing and SSE stream processing. | HIGH |
-
-### MCP Protocol
+### Monitoring -- Prometheus + Grafana
 
 | Technology | Version | Purpose | Why | Confidence |
 |------------|---------|---------|-----|------------|
-| rmcp | 0.16.x | MCP protocol types + transport | Official Rust SDK from modelcontextprotocol org. Implements MCP spec 2025-11-25 with Streamable HTTP, stdio, and task lifecycle. Avoids hand-rolling JSON-RPC 2.0 + MCP capability negotiation. | MEDIUM |
-| serde + serde_json | 1.x / 1.x | JSON serialization | Universal Rust serialization. rmcp and every other crate depend on it. | HIGH |
+| Prometheus | 3.5.1 LTS | Metrics scraping | Current LTS. Scrapes Sentinel's existing `/metrics` endpoint (already exposes `sentinel_requests_total`, `sentinel_request_duration_seconds`, `sentinel_errors_total`, `sentinel_backend_healthy`, `sentinel_rate_limit_hits_total`). No code changes needed. | HIGH |
+| Grafana | 12.3.x | Dashboard & alerting | Current stable. Provisioning via YAML for datasources + dashboards. Anonymous read-only access behind Caddy/Authelia. | HIGH |
 
-**Why rmcp over hand-rolling JSON-RPC:**
-- MCP is more than JSON-RPC -- it includes capability negotiation, tool schema types, session management, SSE framing, and the 2025-11-25 protocol spec.
-- rmcp provides type-safe request/response structures matching the spec, including `ToolInfo`, `CallToolResult`, `ServerCapabilities`, etc.
-- The crate is at 0.16 with rapid iteration (22 releases since March 2025). This means: use it for types and protocol, but own your transport and routing layer.
+**Why standalone Prometheus+Grafana, not ContextForge's monitoring profile:**
+ContextForge bundles Prometheus+Grafana+Loki+Tempo+cAdvisor+postgres_exporter+pgbouncer_exporter+nginx_exporter in its `--profile monitoring`. That's 8 containers for a full observability stack designed for ContextForge's multi-replica architecture. Sentinel is a single binary with 5 built-in metrics. Two containers (Prometheus + Grafana) are sufficient. Adding the extras would waste ~500 MB RAM on a VPS already running 14 containers.
 
-**Risk:** rmcp is pre-1.0 with 35% doc coverage. Pin exact versions and wrap its types behind internal traits so you can swap if needed. The gateway is a custom router, not a standard MCP server -- you use rmcp for protocol types, not its server runtime.
+**What NOT to add:**
+- Loki/Promtail -- log aggregation is overkill. `docker logs sentinel-gateway` + Postgres audit logs cover logging needs.
+- Tempo -- distributed tracing explicitly deferred to v2 (see PROJECT.md Out of Scope: OpenTelemetry).
+- cAdvisor -- container metrics are nice-to-have but the existing n8n container-health workflow already monitors container status. Defer.
+- postgres_exporter -- Sentinel's Postgres is lightweight (audit logs only, <100 MB). Not worth a dedicated exporter.
+- AlertManager -- Grafana has built-in alerting since v9. Using Grafana alerting with Discord webhook contact point avoids an extra container.
 
-### HTTP Server (Upstream-facing)
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| axum | 0.8.x | HTTP server framework | Tokio-native, Tower middleware ecosystem, best DX in Rust web. v0.8 released Jan 2025 with stable API. Extractors for JSON, headers, state. SSE support built in. | HIGH |
-| tower | 0.5.x | Middleware framework | Axum is built on Tower. Use Tower layers for auth, rate limiting, logging, timeout -- composable middleware stack. | HIGH |
-| tower-http | 0.6.x | HTTP-specific middleware | CORS, compression, tracing, timeout layers. Production-tested with axum. | HIGH |
-
-**Why axum over alternatives:**
-- **Not Actix Web:** Actix has its own runtime and actor model. Adds complexity without benefit when already on tokio. Axum's Tower integration gives cleaner middleware composition.
-- **Not Rocket:** Rocket has a more opinionated design, less flexible for custom protocol handling (JSON-RPC over HTTP, SSE).
-- **Not Warp:** Warp's filter-based API produces harder-to-read code and worse error messages. Axum supersedes it in the tokio ecosystem.
-
-### HTTP Client (Downstream to backends)
+### n8n Health Monitoring
 
 | Technology | Version | Purpose | Why | Confidence |
 |------------|---------|---------|-----|------------|
-| reqwest | 0.13.x | HTTP client to backends | Already proven in the existing wrapper. Connection pooling, streaming responses, rustls TLS, HTTP/2. | HIGH |
-| rustls | 0.23.x | TLS (no OpenSSL) | Pure-Rust TLS. No system OpenSSL dependency = simpler Docker builds with scratch/distroless base. aws_lc_rs backend for FIPS-grade crypto. | HIGH |
+| n8n (existing) | latest (already running) | Health check workflows | Already running at `127.0.0.1:8567` with 4 monitoring workflows (CPU, disk, memory, container-health). Add a Sentinel-specific workflow. | HIGH |
+| Discord Webhook (existing) | -- | Alert destination | Already configured for all 4 existing monitoring workflows. Same webhook. | HIGH |
 
-### Authentication
+**New n8n workflow needed:** "Sentinel Gateway Health Check"
+- Trigger: Cron every 2 minutes
+- Action: HTTP GET `http://host.docker.internal:9201/health` (n8n uses `extra_hosts: host.docker.internal:host-gateway`)
+- On failure: Discord embed with gateway status, timestamp, consecutive failure count
+- On recovery: Discord embed confirming recovery
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| jsonwebtoken | 10.x | JWT encode/decode/validate | De facto Rust JWT library. HS256 for v1 (matches current ContextForge). Supports clock skew leeway, custom claims, algorithm allowlisting. Use aws_lc_rs backend (same as rustls). | HIGH |
+**Why n8n, not Grafana alerting for health checks:**
+Both work. Use n8n for binary health (up/down) because it matches the existing container-health pattern and sends richer Discord embeds. Use Grafana alerting for metric thresholds (high latency, error rates, backend failures) because those require PromQL queries.
 
-**JWT flow:** Client sends `Authorization: Bearer <token>`. Axum extractor validates signature + expiry + claims. Claims include role for RBAC lookup. No external auth service needed for v1.
-
-### Database
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| sqlx | 0.8.x | Async Postgres driver | Compile-time checked queries (catches SQL errors at build time). Pure async, no ORM overhead. Migrations built in. Connection pooling via sqlx::PgPool. | HIGH |
-
-**Why sqlx over alternatives:**
-- **Not Diesel:** Diesel requires a DSL and has a steeper learning curve. sqlx lets you write raw SQL with compile-time checking -- better for a gateway with simple audit/config schemas.
-- **Not SeaORM:** ORM abstraction is unnecessary overhead for audit log inserts and config reads. sqlx is closer to the metal.
-- **Schema needs:** Audit logs (who/what/when/args/status), rate limit state (counters), backend config, RBAC rules. Simple relational schema, not ORM territory.
-
-### Rate Limiting
+### Docker Networking for Cutover
 
 | Technology | Version | Purpose | Why | Confidence |
 |------------|---------|---------|-----|------------|
-| governor | 0.10.x | Token bucket rate limiting | GCRA algorithm (functionally equivalent to leaky bucket). Keyed rate limiters for per-client-per-tool limits. Memory-efficient (64 bits per state). Thread-safe with CAS operations. | HIGH |
-| tower-governor | 0.6.x | Tower/Axum integration | Wraps governor as a Tower layer. Drops into the axum middleware stack. | MEDIUM |
+| Docker Compose | v2 (already installed) | Service orchestration | Sentinel already has a `docker-compose.yml`. Extend with network config. | HIGH |
 
-**Note:** tower-governor may not support per-tool keying out of the box. Likely need a custom Tower layer wrapping governor's `RateLimiter<K>` with `(client_id, tool_name)` as the key type. governor itself supports this natively via `RateLimiter::keyed()`.
+**Current Docker network topology (verified):**
 
-### Configuration
+| Network | Containers | Purpose |
+|---------|------------|---------|
+| `mcp-context-forge_mcpnet` | mcp-context-forge-gateway-1, mcp-context-forge-postgres-1, mcp-context-forge-redis-1, mcp-n8n, mcp-sqlite | ContextForge + MCP backends |
+| `n8n-mcp_default` | n8n, system-stats, container-health, chiasm, mcp-n8n, cpu-server | n8n monitoring stack |
+| `webproxy` | caddy, solitaire, chiasm, authelia, wallybrain-music | Public web services |
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| toml | 0.8.x | TOML parsing | Standard Rust config format. Familiar from Cargo.toml. Fast, well-maintained (~416M downloads). | HIGH |
-| serde | 1.x | Config deserialization | Deserialize TOML directly into typed Rust structs. Compile-time validation of config shape. | HIGH |
-| dotenvy | 0.15.x | .env file loading | Already used in wrapper. Loads secrets from .env without committing them. | HIGH |
+**Critical observation:** `mcp-n8n` is on BOTH `mcp-context-forge_mcpnet` and `n8n-mcp_default`. This is because it's defined in ContextForge's compose but shares the n8n network for communication. The MCP backend containers (mcp-n8n, mcp-sqlite) need to be accessible to Sentinel after cutover.
 
-**Why TOML + serde directly, not the `config` crate:**
-- The `config` crate adds layered merging and multiple format support that adds complexity without value. TOML files + env var overrides via clap/dotenvy cover all needs.
-- Config struct with `#[derive(Deserialize)]` + `toml::from_str()` is 5 lines, fully typed, and compile-time checked.
-- Hot reload: `notify` crate (0.7.x) watches config file, re-parse on change, swap via `ArcSwap`.
+**Cutover strategy -- join existing network, not create new one:**
 
-### CLI
+```yaml
+# sentinel-gateway/docker-compose.yml additions
+services:
+  gateway:
+    networks:
+      - sentinel-net        # Private: gateway <-> sentinel-postgres
+      - mcp-context-forge_mcpnet  # Shared: gateway <-> mcp-n8n, mcp-sqlite
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| clap | 4.5.x | CLI argument parsing | Derive macros for zero-boilerplate CLI. Env var bindings built in. Already used in wrapper. | HIGH |
+  postgres:
+    networks:
+      - sentinel-net        # Private: only gateway needs DB access
 
-### Observability
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| tracing | 0.1.x | Structured logging/tracing | Industry standard Rust observability. Structured fields, span context, async-aware. Already used in wrapper. | HIGH |
-| tracing-subscriber | 0.3.x | Log output formatting | EnvFilter for runtime log level control. JSON formatter for machine-readable logs. File + stderr output. | HIGH |
-| tracing-appender | 0.2.x | Non-blocking log writer | Async file appender so logging doesn't block the event loop. | HIGH |
-
-**Audit logging strategy:** tracing handles operational logs (debug, errors, performance). Audit logs go to Postgres via sqlx (structured records with query capability). These are separate concerns -- don't conflate them.
-
-### Process Management (stdio backends)
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| tokio::process | (part of tokio) | Spawn child processes | Async child process management for stdio-based MCP backends (context7, firecrawl, exa, etc.). Stdin/stdout/stderr pipes. | HIGH |
-| flume | 0.12.x | MPMC channels | High-performance channels between stdio reader/writer tasks and request router. Already proven in wrapper. | HIGH |
-
-### Error Handling
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| thiserror | 2.x | Error type derivation | Derive `Error` impls with `#[error("...")]` format strings. Clean error enums for gateway-specific errors. | HIGH |
-| anyhow | 1.x | Application error context | For top-level error chains in main/startup. NOT in library code -- use thiserror for typed errors in the core. | HIGH |
-
-### Performance
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| mimalloc | 0.1.x | Global allocator | Faster than system allocator for concurrent workloads. Already used in wrapper. Drop-in replacement. | HIGH |
-| bytes | 1.x | Zero-copy byte buffers | Reference-counted byte slices. Avoid copying HTTP response bodies. Already used in wrapper. | HIGH |
-| arc-swap | 1.x | Lock-free atomic pointer | Hot-swap config and rate limit state without locks. Already used in wrapper for session ID. | HIGH |
-
-### Testing
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| tokio::test | (part of tokio) | Async test runtime | `#[tokio::test]` for async unit tests. | HIGH |
-| axum::test | (part of axum) | HTTP handler testing | `TestClient` for integration tests without starting a real server. | HIGH |
-| wiremock | 0.6.x | HTTP mock server | Mock backend MCP servers in tests. Verify request shapes, simulate errors, test retries. | MEDIUM |
-| testcontainers | 0.23.x | Postgres in tests | Spin up real Postgres in Docker for integration tests. Tests run against real DB, not mocks. | MEDIUM |
-| cargo-llvm-cov | (CLI tool) | Code coverage | Already used in wrapper build system. | HIGH |
-
-### Docker / Deployment
-
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Docker multi-stage | -- | Build container | Stage 1: `rust:1.83-slim` for build. Stage 2: `debian:bookworm-slim` for runtime (~80 MB). Could go distroless (~30 MB) but bookworm-slim is easier to debug. | HIGH |
-| docker-compose | -- | Service orchestration | Gateway + Postgres. Matches current VPS pattern. `restart: unless-stopped`. Health checks. | HIGH |
-
-**Docker build strategy:**
-```dockerfile
-# Stage 1: Build
-FROM rust:1.83-slim AS builder
-RUN apt-get update && apt-get install -y pkg-config libssl-dev
-WORKDIR /app
-COPY . .
-RUN cargo build --release
-
-# Stage 2: Runtime
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /app/target/release/sentinel-gateway /usr/local/bin/
-ENTRYPOINT ["sentinel-gateway"]
+networks:
+  sentinel-net:
+    driver: bridge
+  mcp-context-forge_mcpnet:
+    external: true          # Join ContextForge's existing network
 ```
 
-**Note:** With rustls (no OpenSSL linking), the runtime image only needs ca-certificates. Could use `FROM scratch` but lose shell access for debugging.
+**Why join `mcp-context-forge_mcpnet` instead of creating a new network:**
+- `mcp-n8n` and `mcp-sqlite` are already on this network with DNS names `mcp-n8n` and `mcp-sqlite`.
+- Sentinel's `sentinel.toml` already references `http://mcp-n8n:3000` and `http://mcp-sqlite:3000`.
+- Creating a new network would require either moving the MCP backend containers or using host networking, both more disruptive.
+- After ContextForge is stopped, the network persists (Docker keeps external networks alive).
+
+**Cutover sequence:**
+1. Start Sentinel on `127.0.0.1:9201` (already configured, different port from ContextForge's 9200)
+2. Verify all 7 backends respond through Sentinel
+3. Update `~/.claude/settings.json` to point MCP at port 9201
+4. Verify Claude Code tools work
+5. Stop ContextForge (`docker compose down` in `/home/lwb3/mcp-context-forge/`)
+6. Optionally rebind Sentinel to port 9200 for consistency
+
+**Port decision:** Keep 9201 or switch to 9200. Recommendation: switch to 9200 after ContextForge is down, because `~/.claude/settings.json` currently points at 9200 and changing it requires a Claude Code restart. Switching Sentinel to 9200 means updating one line in `sentinel.toml` and `docker-compose.yml`, then `docker compose up -d`.
+
+### Network Hardening
+
+No new tools needed. Use existing iptables + Docker bind address.
+
+| Concern | Current State | Action Needed |
+|---------|--------------|---------------|
+| Gateway bind address | `127.0.0.1:9201` in docker-compose.yml | Already correct. Verify no `0.0.0.0` binding. |
+| Postgres bind address | No port mapping (internal only) | Already correct. Only gateway container can reach it via Docker network. |
+| Prometheus scrape | Not yet deployed | Bind to `127.0.0.1:9090`. Scrapes gateway on Docker internal network. |
+| Grafana UI | Not yet deployed | Bind to `127.0.0.1:3000`. Caddy reverse proxy with Authelia for public access. |
+| iptables | Existing rules block eth0 for 8080, 9999 | No new rules needed if Prometheus/Grafana bind to 127.0.0.1. |
+
+## Prometheus Configuration
+
+```yaml
+# sentinel-gateway/monitoring/prometheus.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'sentinel-gateway'
+    static_configs:
+      - targets: ['sentinel-gateway:9201']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+```
+
+**Why 10s scrape interval for Sentinel:** MCP tool calls are bursty (Claude sends multiple tools in rapid succession). 15s default could miss short-lived spikes. 10s gives better resolution without meaningfully increasing storage (~40 bytes/sample, negligible).
+
+## Grafana Configuration
+
+### Provisioned Datasource
+
+```yaml
+# sentinel-gateway/monitoring/grafana/provisioning/datasources/prometheus.yml
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+```
+
+### Dashboard Panels (pre-provisioned)
+
+| Panel | PromQL | Purpose |
+|-------|--------|---------|
+| Request Rate | `rate(sentinel_requests_total[5m])` | Requests per second by tool and status |
+| Error Rate | `rate(sentinel_errors_total[5m])` | Errors per second by type |
+| Latency P50/P95/P99 | `histogram_quantile(0.95, rate(sentinel_request_duration_seconds_bucket[5m]))` | Request latency distribution |
+| Backend Health | `sentinel_backend_healthy` | Up/down status per backend |
+| Rate Limit Hits | `rate(sentinel_rate_limit_hits_total[5m])` | Rate limiting activity |
+| Gateway Up | `up{job="sentinel-gateway"}` | Prometheus can reach the gateway |
+
+### Grafana Alerting (Discord)
+
+| Alert | Condition | Severity |
+|-------|-----------|----------|
+| Gateway Down | `up{job="sentinel-gateway"} == 0` for 1m | Critical |
+| Backend Unhealthy | `sentinel_backend_healthy == 0` for 2m | Warning |
+| High Error Rate | `rate(sentinel_errors_total[5m]) > 0.5` | Warning |
+| High Latency | `histogram_quantile(0.95, ...) > 5` for 5m | Warning |
+
+Contact point: Discord webhook (same URL as existing n8n alerts).
+
+## Docker Compose Additions
+
+```yaml
+# Added to sentinel-gateway/docker-compose.yml
+services:
+  prometheus:
+    image: prom/prometheus:v3.5.1
+    container_name: sentinel-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheusdata:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=1GB'
+    networks:
+      - sentinel-net
+
+  grafana:
+    image: grafana/grafana:12.3.1
+    container_name: sentinel-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SERVER_ROOT_URL=https://grafana.wallybrain.icu
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - sentinel-net
+
+volumes:
+  prometheusdata:
+  grafanadata:
+```
+
+**Storage limits:** `--storage.tsdb.retention.time=30d` and `--storage.tsdb.retention.size=1GB` prevent Prometheus from consuming disk. With 5 metrics scraped every 10s, 30 days of data is roughly 50-100 MB. The 1GB cap is a safety net.
+
+**Grafana access:** Bind to `127.0.0.1:3000`, proxy through Caddy at `grafana.wallybrain.icu` (or a subpath) with Authelia 2FA. The `GF_AUTH_ANONYMOUS_ENABLED=false` ensures Grafana itself also requires login.
+
+## Resource Impact
+
+| Container | Expected RAM | CPU | Disk |
+|-----------|-------------|-----|------|
+| Prometheus | ~50-80 MB | Minimal | ~50-100 MB (30d retention) |
+| Grafana | ~50-80 MB | Minimal | ~10 MB (dashboards + sqlite) |
+| **Total new** | **~100-160 MB** | **Negligible** | **~60-110 MB** |
+
+VPS has 16 GB RAM with 14 containers currently. Adding ~150 MB is well within headroom.
 
 ## Alternatives Considered
 
 | Category | Recommended | Alternative | Why Not |
 |----------|-------------|-------------|---------|
-| HTTP Framework | axum 0.8 | Actix Web 4 | Own runtime/actor model adds complexity; axum's Tower integration is cleaner for middleware composition |
-| HTTP Framework | axum 0.8 | Warp | Filter-based API produces unreadable type errors; Warp is effectively unmaintained vs axum |
-| Database | sqlx 0.8 | Diesel 2 | DSL learning curve + proc macro compile times; sqlx's raw SQL with compile-time checks is simpler for this use case |
-| Database | sqlx 0.8 | SeaORM | ORM abstraction unnecessary for audit logs + config reads; adds dependency weight |
-| MCP Protocol | rmcp 0.16 | Hand-rolled JSON-RPC | MCP is more than JSON-RPC (capabilities, schemas, session mgmt); rmcp provides spec-compliant types |
-| MCP Protocol | rmcp 0.16 | jsonrpc-core 18 | jsonrpc-core is transport-agnostic JSON-RPC only, doesn't cover MCP-specific protocol layers |
-| Rate Limiting | governor 0.10 | tower built-in RateLimit | Tower's RateLimit is per-service, not keyed. governor supports per-key (client+tool) limiting |
-| Config | toml + serde | config crate | config crate adds format layering complexity; TOML + env vars is sufficient |
-| TLS | rustls | OpenSSL | Pure Rust, no system dependency, simpler Docker builds, FIPS via aws_lc_rs |
-| JWT | jsonwebtoken 10 | jwt-simple | jsonwebtoken is more mature, more downloads, better documented |
+| Metrics scraping | Prometheus standalone | ContextForge monitoring profile | 8 containers vs 1; overkill for 5 metrics from single service |
+| Dashboards | Grafana | Prometheus built-in UI | Prometheus UI shows raw PromQL, no persistent dashboards or alerting |
+| Log aggregation | Docker logs + Postgres audit | Loki + Promtail | Extra 2 containers; `docker logs` + audit table sufficient for single-instance |
+| Health alerts (binary) | n8n workflow | Grafana alerting only | n8n matches existing monitoring pattern; richer Discord embeds |
+| Metric alerts (threshold) | Grafana alerting | AlertManager | Grafana built-in alerting avoids extra container; sufficient for single-instance |
+| Container metrics | Skip for now | cAdvisor | Existing container-health n8n workflow covers up/down; cAdvisor adds ~100MB RAM |
+| Network cutover | Join existing mcpnet | Create new network | MCP backends already have DNS on mcpnet; less disruptive |
 
-## What NOT to Use
+## What NOT to Add (Explicit)
 
-| Technology | Why Not |
-|------------|---------|
-| OpenSSL | System dependency complicates Docker builds. rustls is pure Rust and sufficient. |
-| Diesel | Heavy ORM for simple schemas. Compile-time cost of proc macros not justified. |
-| Actix Web | Different async runtime model. Mixing tokio ecosystems adds friction. |
-| tonic (gRPC) | MCP uses JSON-RPC over HTTP/stdio, not gRPC. Wrong protocol. |
-| Redis | Rate limit state can live in-memory (governor) for v1 single-instance. Postgres for persistence. Adding Redis is premature for single-instance deployment. |
-| OpenTelemetry | Explicitly deferred to v2 per project scope. tracing + Postgres audit logs sufficient for v1. |
-| OPA | Policy-as-code engine deferred to v2. Simple TOML-based RBAC config for v1. |
+| Technology | Why Skip |
+|------------|----------|
+| Loki/Promtail | Log aggregation deferred. Docker logs + Postgres audit logs are queryable and sufficient. |
+| Tempo | Distributed tracing explicitly out of scope (PROJECT.md). |
+| cAdvisor | Container metrics not needed when container-health workflow already monitors status. |
+| postgres_exporter | Sentinel Postgres is lightweight audit-only. Not worth a dedicated exporter. |
+| AlertManager | Grafana built-in alerting handles Discord webhooks directly. |
+| Redis | No caching or shared state needed for single-instance. |
+| Traefik/Nginx | Caddy already handles reverse proxy + TLS for all VPS services. |
+| OpenTelemetry SDK | Explicitly deferred to v2. Prometheus crate already in Rust binary. |
 
-## Full Dependency List
+## Installation
 
-### Cargo.toml (Core)
+No Rust code changes needed. The `/metrics` endpoint already exists.
 
-```toml
-[dependencies]
-# Async runtime
-tokio = { version = "1.47", features = ["full"] }
-tokio-util = { version = "0.7", features = ["codec"] }
+```bash
+# Directory structure to create
+mkdir -p monitoring/grafana/provisioning/{datasources,dashboards}
 
-# MCP protocol
-rmcp = { version = "0.16", features = ["server", "client", "transport-streamable-http-server", "transport-streamable-http-client"] }
-
-# HTTP server
-axum = { version = "0.8", features = ["json", "macros"] }
-tower = { version = "0.5", features = ["full"] }
-tower-http = { version = "0.6", features = ["cors", "trace", "timeout", "compression-gzip"] }
-
-# HTTP client
-reqwest = { version = "0.13", default-features = false, features = ["rustls-tls", "json", "stream", "http2"] }
-
-# Auth
-jsonwebtoken = { version = "10", features = ["aws_lc_rs"] }
-
-# Database
-sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json"] }
-
-# Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-
-# Configuration
-toml = "0.8"
-dotenvy = "0.15"
-clap = { version = "4.5", features = ["derive", "env"] }
-
-# Rate limiting
-governor = "0.10"
-
-# Observability
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-tracing-appender = "0.2"
-
-# Channels & concurrency
-flume = "0.12"
-arc-swap = "1"
-
-# Error handling
-thiserror = "2"
-anyhow = "1"
-
-# Performance
-mimalloc = { version = "0.1", default-features = false }
-bytes = "1"
-
-# Utilities
-uuid = { version = "1", features = ["v4", "serde"] }
-chrono = { version = "0.4", features = ["serde"] }
-futures = "0.3"
-
-[dev-dependencies]
-wiremock = "0.6"
-testcontainers = "0.23"
-tokio-test = "0.4"
+# Files to create:
+# monitoring/prometheus.yml
+# monitoring/grafana/provisioning/datasources/prometheus.yml
+# monitoring/grafana/provisioning/dashboards/dashboard.yml (provider config)
+# monitoring/grafana/provisioning/dashboards/sentinel.json (dashboard JSON)
 ```
-
-### Build Profile
-
-```toml
-[profile.release]
-lto = "fat"
-codegen-units = 1
-strip = true
-panic = "abort"
-```
-
-**Rationale:** `lto = "fat"` + `codegen-units = 1` maximizes runtime performance at the cost of longer compile times (acceptable for release builds). `strip = true` reduces binary size. `panic = "abort"` eliminates unwind tables (~10% smaller binary). This matches the existing wrapper's build profile.
-
-## Version Pinning Strategy
-
-- **Pin major.minor** in Cargo.toml (e.g., `"0.8"` not `"0.8.6"`). Cargo.lock pins exact versions.
-- **Exception:** rmcp -- pin exact version (`"=0.16.0"`) because it's pre-1.0 with frequent breaking changes.
-- **LTS preference:** Use tokio 1.47.x LTS (supported until Sept 2026) rather than bleeding-edge 1.49.
 
 ## Sources
 
-- [Axum 0.8.0 announcement](https://tokio.rs/blog/2025-01-01-announcing-axum-0-8-0) -- axum v0.8 release notes
-- [rmcp on crates.io](https://crates.io/crates/rmcp) -- official MCP Rust SDK, v0.16.0
-- [rmcp GitHub](https://github.com/modelcontextprotocol/rust-sdk) -- MCP spec 2025-11-25 implementation
-- [sqlx on GitHub](https://github.com/launchbadge/sqlx) -- v0.8.6 stable
-- [governor on GitHub](https://github.com/boinkor-net/governor) -- v0.10.2, GCRA rate limiting
-- [jsonwebtoken on crates.io](https://crates.io/crates/jsonwebtoken) -- v10.3.0
-- [tokio versions](https://crates.io/crates/tokio/versions) -- LTS 1.47.x until Sept 2026
-- [Rust wrapper analysis](/home/lwb3/sentinel-gateway/docs/RUST-WRAPPER-ANALYSIS.md) -- existing crate choices validated
+- [Prometheus 3.5.1 LTS release](https://github.com/prometheus/prometheus/releases) -- current stable, Jan 2026
+- [Grafana 12.3 release](https://grafana.com/docs/grafana/latest/whatsnew/whats-new-in-v12-3/) -- current stable, Feb 2026
+- [Grafana alerting with Discord](https://grafana.com/docs/grafana/latest/alerting/configure-notifications/manage-contact-points/) -- built-in contact points
+- [Prometheus storage sizing](https://prometheus.io/docs/prometheus/latest/storage/) -- ~1-2 bytes per sample
+- Sentinel Gateway `/metrics` endpoint -- 5 metric families, standard Prometheus text format
+- VPS container audit (2026-02-22) -- 14 running containers, 16 GB RAM, 34% disk used
