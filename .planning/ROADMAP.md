@@ -116,7 +116,7 @@ Plans:
   3. The gateway periodically pings each backend and tracks whether it is up or down
   4. A backend that fails N consecutive health checks is circuit-broken (requests fail fast without attempting the backend)
   5. On SIGTERM, the gateway drains in-flight requests, terminates stdio children, flushes audit logs, then exits
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 07-01-PLAN.md -- Health module with axum server, background checker, and circuit breaker
 - [x] 07-02-PLAN.md -- Wire health, circuit breaker, and graceful shutdown into dispatch loop and main.rs
@@ -166,7 +166,7 @@ Plans:
 | 4. Authentication & Authorization | 2/2 | Complete    | 2026-02-22 |
 | 5. Audit Logging | 2/2 | Complete    | 2026-02-22 |
 | 6. Rate Limiting & Kill Switch | 2/2 | Complete    | 2026-02-22 |
-| 7. Health & Reliability | 2/2 | Complete | 2026-02-22 |
+| 7. Health & Reliability | 2/2 | Complete    | 2026-02-22 |
 | 8. stdio Backend Management | 0/? | Not started | - |
 | 9. Observability & Hot Reload | 0/? | Not started | - |
 | 10. Deployment & Integration | 0/? | Not started | - |
