@@ -87,7 +87,7 @@ Plans:
   2. Every audit log entry includes a unique request UUID that traces the call end-to-end
   3. Audit writes are async -- a slow Postgres connection does not block or slow down tool call responses
   4. Database schema migrations run automatically when the gateway starts (no manual SQL required)
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 05-01-PLAN.md -- Audit module with PgPool, embedded migrations, AuditEntry struct, and async writer
 - [x] 05-02-PLAN.md -- Wire audit into dispatch loop and main.rs startup sequence
@@ -158,7 +158,7 @@ Plans:
 | 2. MCP Protocol Layer | 2/2 | Complete | 2026-02-22 |
 | 3. HTTP Backend Routing | 2/2 | Complete | 2026-02-22 |
 | 4. Authentication & Authorization | 2/2 | Complete    | 2026-02-22 |
-| 5. Audit Logging | 2/2 | Complete | 2026-02-22 |
+| 5. Audit Logging | 2/2 | Complete    | 2026-02-22 |
 | 6. Rate Limiting & Kill Switch | 0/? | Not started | - |
 | 7. Health & Reliability | 0/? | Not started | - |
 | 8. stdio Backend Management | 0/? | Not started | - |
