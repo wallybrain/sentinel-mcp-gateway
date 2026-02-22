@@ -69,7 +69,7 @@ Deferred to future milestone. Tracked but not in current roadmap.
 | Alertmanager | Grafana built-in alerting + n8n health check provides dual-path without extra container |
 | Loki log aggregation | `docker logs` + Postgres audit covers needs, Loki adds 500+ MB RAM |
 | OpenTelemetry tracing | Single-hop architecture, no multi-service correlation needed |
-| Automated rollback | Dangerous — incorrect health check = thrashing between services |
+| Automated rollback | Dangerous -- incorrect health check = thrashing between services |
 | Nginx/Traefik proxy | Caddy already handles reverse proxy, Sentinel is localhost-only |
 | Public hostname/TLS | Claude Code runs on same VPS, no external access needed |
 | cAdvisor resource monitoring | Existing container-health workflow covers container status |
@@ -81,35 +81,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PREP-01 | — | Pending |
-| PREP-02 | — | Pending |
-| PREP-03 | — | Pending |
-| PREP-04 | — | Pending |
-| PREP-05 | — | Pending |
-| CUT-01 | — | Pending |
-| CUT-02 | — | Pending |
-| CUT-03 | — | Pending |
-| CUT-04 | — | Pending |
-| CUT-05 | — | Pending |
-| NET-01 | — | Pending |
-| NET-02 | — | Pending |
-| NET-03 | — | Pending |
-| NET-04 | — | Pending |
-| MON-01 | — | Pending |
-| MON-02 | — | Pending |
-| MON-03 | — | Pending |
-| MON-04 | — | Pending |
-| MON-05 | — | Pending |
-| MON-06 | — | Pending |
-| OPS-01 | — | Pending |
-| OPS-02 | — | Pending |
-| OPS-03 | — | Pending |
+| PREP-01 | Phase 10 | Pending |
+| PREP-02 | Phase 10 | Pending |
+| PREP-03 | Phase 10 | Pending |
+| PREP-04 | Phase 10 | Pending |
+| PREP-05 | Phase 10 | Pending |
+| CUT-01 | Phase 11 | Pending |
+| CUT-02 | Phase 11 | Pending |
+| CUT-03 | Phase 11 | Pending |
+| CUT-04 | Phase 11 | Pending |
+| CUT-05 | Phase 11 | Pending |
+| NET-01 | Phase 12 | Pending |
+| NET-02 | Phase 12 | Pending |
+| NET-03 | Phase 12 | Pending |
+| NET-04 | Phase 12 | Pending |
+| MON-01 | Phase 13 | Pending |
+| MON-02 | Phase 13 | Pending |
+| MON-03 | Phase 13 | Pending |
+| MON-04 | Phase 13 | Pending |
+| MON-05 | Phase 13 | Pending |
+| MON-06 | Phase 13 | Pending |
+| OPS-01 | Phase 14 | Pending |
+| OPS-02 | Phase 14 | Pending |
+| OPS-03 | Phase 14 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23 ⚠️
+- Mapped to phases: 23
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-22*
-*Last updated: 2026-02-22 after initial definition*
+*Last updated: 2026-02-22 after roadmap creation -- traceability complete*
