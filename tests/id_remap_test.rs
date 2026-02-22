@@ -1,6 +1,6 @@
 use sentinel_gateway::protocol::jsonrpc::{
-    JsonRpcError, JsonRpcId, JsonRpcRequest, JsonRpcResponse, INTERNAL_ERROR, INVALID_PARAMS,
-    INVALID_REQUEST, METHOD_NOT_FOUND, PARSE_ERROR,
+    JsonRpcId, JsonRpcRequest, JsonRpcResponse, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST,
+    METHOD_NOT_FOUND, PARSE_ERROR,
 };
 use sentinel_gateway::protocol::id_remapper::IdRemapper;
 use std::collections::HashSet;
