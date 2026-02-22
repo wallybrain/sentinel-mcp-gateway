@@ -59,7 +59,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **KILL-01**: Gateway can disable individual tools via config (requests return JSON-RPC error)
 - [x] **KILL-02**: Gateway can disable entire backends via config (all tools on that backend return error)
-- [ ] **KILL-03**: Kill switch changes take effect via hot config reload without restart
+- [x] **KILL-03**: Kill switch changes take effect via hot config reload without restart
 
 ### Health & Reliability
 
@@ -73,15 +73,15 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **CONFIG-01**: All gateway behavior is configured via a single `sentinel.toml` file
 - [x] **CONFIG-02**: Config includes: auth settings, backend definitions, role-to-tool mappings, rate limits, kill switches
-- [ ] **CONFIG-03**: Gateway supports hot config reload via SIGHUP signal or file watch
+- [x] **CONFIG-03**: Gateway supports hot config reload via SIGHUP signal or file watch
 - [x] **CONFIG-04**: Secrets (JWT key, Postgres password) are injected via environment variables, never in config file
 
 ### Observability
 
 - [x] **OBS-01**: Gateway exposes `/metrics` endpoint with Prometheus-compatible metrics
 - [x] **OBS-02**: Metrics include: request count, latency histogram, error rate, backend health, rate limit hits per tool
-- [ ] **OBS-03**: Gateway validates tool call arguments against cached JSON schemas from `tools/list`
-- [ ] **OBS-04**: Invalid arguments are rejected at the gateway with descriptive JSON-RPC error before reaching backend
+- [x] **OBS-03**: Gateway validates tool call arguments against cached JSON schemas from `tools/list`
+- [x] **OBS-04**: Invalid arguments are rejected at the gateway with descriptive JSON-RPC error before reaching backend
 
 ### Deployment
 
@@ -169,7 +169,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RATE-03 | Phase 6 | Pending |
 | KILL-01 | Phase 6 | Pending |
 | KILL-02 | Phase 6 | Pending |
-| KILL-03 | Phase 9 | Pending |
+| KILL-03 | Phase 9 | Complete |
 | HEALTH-01 | Phase 7 | Complete |
 | HEALTH-02 | Phase 7 | Complete |
 | HEALTH-03 | Phase 7 | Complete |
@@ -177,12 +177,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HEALTH-05 | Phase 7 | Complete |
 | CONFIG-01 | Phase 1 | Complete |
 | CONFIG-02 | Phase 1 | Complete |
-| CONFIG-03 | Phase 9 | Pending |
+| CONFIG-03 | Phase 9 | Complete |
 | CONFIG-04 | Phase 1 | Complete |
 | OBS-01 | Phase 9 | Complete |
 | OBS-02 | Phase 9 | Complete |
-| OBS-03 | Phase 9 | Pending |
-| OBS-04 | Phase 9 | Pending |
+| OBS-03 | Phase 9 | Complete |
+| OBS-04 | Phase 9 | Complete |
 | DEPLOY-01 | Phase 1 | Complete |
 | DEPLOY-02 | Phase 10 | Pending |
 | DEPLOY-03 | Phase 10 | Pending |

@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 9 in progress -- metrics, schema validation, and hot config complete (2/3 plans) |
+| Current Focus | Phase 9 COMPLETE -- metrics, schema validation, hot config all wired into gateway |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -13,9 +13,9 @@
 
 | Field | Value |
 |-------|-------|
-| Phase | 09-observability |
-| Plan | 03 |
-| Status | Phase 9 plans 01-02 complete, plan 03 remaining |
+| Phase | 10-deployment |
+| Plan | 01 |
+| Status | Phase 9 complete (3/3 plans), Phase 10 next |
 
 **Overall Progress:**
 ```
@@ -27,7 +27,7 @@ Phase  5 [x] Audit Logging (2/2 plans)
 Phase  6 [x] Rate Limiting & Kill Switch (2/2 plans)
 Phase  7 [x] Health & Reliability (2/2 plans)
 Phase  8 [x] stdio Backend Management (3/3 plans)
-Phase  9 [ ] Observability & Hot Reload (2/3 plans)
+Phase  9 [x] Observability & Hot Reload (3/3 plans)
 Phase 10 [ ] Deployment & Integration
 ```
 
@@ -35,10 +35,10 @@ Phase 10 [ ] Deployment & Integration
 
 | Metric | Value |
 |--------|-------|
-| Phases completed | 8/10 |
-| Plans completed | 19/? |
-| Requirements completed | 43/47 |
-| Session count | 7 |
+| Phases completed | 9/10 |
+| Plans completed | 22/? |
+| Requirements completed | 47/47 |
+| Session count | 8 |
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -59,6 +59,7 @@ Phase 10 [ ] Deployment & Integration
 | 08 | 03 | 8min | 2 | 7 |
 | 09 | 01 | 6min | 2 | 4 |
 | 09 | 02 | 6min | 2 | 6 |
+| 09 | 03 | 8min | 2 | 6 |
 
 ## Accumulated Context
 
@@ -93,7 +94,7 @@ Phase 10 [ ] Deployment & Integration
 - CallerIdentity passed to run_dispatch (not JwtValidator) for testability and separation of concerns
 - JWT validation in main.rs, RBAC enforcement in gateway.rs
 - AUTHZ_ERROR is -32003 (distinct from -32001 auth and -32002 not-initialized)
-- Enforcement order: kill switch -> rate limit -> RBAC -> circuit breaker -> backend call
+- Enforcement order: kill switch -> rate limit -> RBAC -> schema validation -> circuit breaker -> backend call
 - Kill switch filters both tools/list and tools/call for consistency
 - All rejection types (killed, rate_limited) emit audit entries with latency_ms=0
 - Axum 0.8 for health HTTP server (separate from main MCP transport)
@@ -119,6 +120,10 @@ Phase 10 [ ] Deployment & Integration
 - jsonschema 0.42 for tool argument validation (instance_path() is method, not field)
 - Clone derive on KillSwitchConfig for HotConfig creation from parsed config
 - HotConfig only reloads kill_switch + rate_limits (backend/auth require restart)
+- SharedHotConfig as Arc<RwLock<HotConfig>> for async read access in dispatch loop
+- Schema validation after RBAC, before circuit breaker (invalid args never reach backend)
+- SIGHUP handler in separate tokio::spawn (loops forever, does not cancel on signal)
+- Metrics passed as Option<Arc<Metrics>> for backward compat in tests
 
 ### Known Gotchas
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -136,16 +141,16 @@ Phase 10 [ ] Deployment & Integration
 - None
 
 ### TODOs
-- Execute Phase 9 Plan 03 (wire validation + hot config into gateway dispatch)
+- Plan and execute Phase 10 (Deployment & Integration)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 09-02-PLAN.md -- SchemaCache for JSON schema validation, HotConfig struct for atomic config reload, 8 unit tests (33 total)
-- **Stopped at:** Completed 09-02-PLAN.md (Phase 9: 2/3 plans complete)
-- **Next step:** Execute Phase 9 Plan 03 (wire validation + hot config into gateway dispatch)
+- **What happened:** Executed 09-03-PLAN.md -- wired metrics, schema validation, and hot config reload into gateway dispatch and main.rs. 138 tests passing.
+- **Stopped at:** Completed 09-03-PLAN.md (Phase 9: 3/3 plans complete)
+- **Next step:** Plan and execute Phase 10 (Deployment & Integration)
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22T07:46Z*
+*Last updated: 2026-02-22T07:58Z*

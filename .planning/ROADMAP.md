@@ -15,7 +15,7 @@
 - [x] **Phase 6: Rate Limiting & Kill Switch** - Per-client per-tool token bucket and per-tool/backend disable switches
 - [x] **Phase 7: Health & Reliability** - Health endpoints, backend pinging, circuit breaker, and graceful shutdown
 - [x] **Phase 8: stdio Backend Management** - Spawn, supervise, and multiplex JSON-RPC over stdio child processes
-- [ ] **Phase 9: Observability & Hot Reload** - Prometheus metrics, schema validation, and zero-downtime config reload
+- [x] **Phase 9: Observability & Hot Reload** - Prometheus metrics, schema validation, and zero-downtime config reload
 - [ ] **Phase 10: Deployment & Integration** - Docker image, Compose stack, and production cutover from ContextForge
 
 ## Phase Details
@@ -151,7 +151,7 @@ Plans:
 Plans:
 - [x] 09-01-PLAN.md -- Prometheus metrics module and /metrics endpoint on health server
 - [x] 09-02-PLAN.md -- Schema validation module and hot-reloadable config struct
-- [ ] 09-03-PLAN.md -- Wire metrics, validation, and hot reload into gateway dispatch and main.rs
+- [x] 09-03-PLAN.md -- Wire metrics, validation, and hot reload into gateway dispatch and main.rs
 
 ### Phase 10: Deployment & Integration
 **Goal**: The gateway ships as a Docker image in a Compose stack and fully replaces ContextForge on the VPS
@@ -176,7 +176,7 @@ Plans:
 | 6. Rate Limiting & Kill Switch | 2/2 | Complete    | 2026-02-22 |
 | 7. Health & Reliability | 2/2 | Complete    | 2026-02-22 |
 | 8. stdio Backend Management | 3/3 | Complete    | 2026-02-22 |
-| 9. Observability & Hot Reload | 2/3 | In progress | - |
+| 9. Observability & Hot Reload | 3/3 | Complete | 2026-02-22 |
 | 10. Deployment & Integration | 0/? | Not started | - |
 
 ---
