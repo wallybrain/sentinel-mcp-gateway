@@ -7,7 +7,7 @@ use tokio::sync::{mpsc, RwLock};
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 
-use sentinel_gateway::backend::HttpBackend;
+use sentinel_gateway::backend::Backend;
 use sentinel_gateway::catalog::create_stub_catalog;
 use sentinel_gateway::config::types::{KillSwitchConfig, RateLimitConfig, RbacConfig, RoleConfig};
 use sentinel_gateway::gateway::run_dispatch;
@@ -82,7 +82,7 @@ async fn test_circuit_breaker_blocks_after_failures() {
 
     let catalog = create_stub_catalog();
     let catalog: &'static _ = Box::leak(Box::new(catalog));
-    let backends: HashMap<String, HttpBackend> = HashMap::new();
+    let backends: HashMap<String, Backend> = HashMap::new();
     let backends: &'static _ = Box::leak(Box::new(backends));
     let id_remapper = IdRemapper::new();
     let id_remapper: &'static _ = Box::leak(Box::new(id_remapper));
@@ -127,7 +127,7 @@ async fn test_circuit_breaker_blocks_after_failures() {
 async fn test_dispatch_exits_on_cancel() {
     let catalog = create_stub_catalog();
     let catalog: &'static _ = Box::leak(Box::new(catalog));
-    let backends: HashMap<String, HttpBackend> = HashMap::new();
+    let backends: HashMap<String, Backend> = HashMap::new();
     let backends: &'static _ = Box::leak(Box::new(backends));
     let id_remapper = IdRemapper::new();
     let id_remapper: &'static _ = Box::leak(Box::new(id_remapper));

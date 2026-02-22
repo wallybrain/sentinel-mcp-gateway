@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tokio::time::{timeout, Duration};
 
 use sentinel_gateway::auth::jwt::CallerIdentity;
-use sentinel_gateway::backend::HttpBackend;
+use sentinel_gateway::backend::Backend;
 use sentinel_gateway::catalog::create_stub_catalog;
 use sentinel_gateway::config::types::{KillSwitchConfig, RateLimitConfig, RbacConfig, RoleConfig};
 use sentinel_gateway::gateway::run_dispatch;
@@ -94,7 +94,7 @@ async fn spawn_dispatch_with_config(
     let catalog = create_stub_catalog();
     let catalog: &'static _ = Box::leak(Box::new(catalog));
 
-    let backends: HashMap<String, HttpBackend> = HashMap::new();
+    let backends: HashMap<String, Backend> = HashMap::new();
     let backends: &'static _ = Box::leak(Box::new(backends));
 
     let id_remapper = IdRemapper::new();
@@ -361,7 +361,7 @@ async fn test_tools_call_backend_not_in_map_returns_internal_error() {
     let catalog: &'static _ = Box::leak(Box::new(catalog));
 
     // Empty backends map (no stub-n8n or stub-sqlite)
-    let backends: HashMap<String, HttpBackend> = HashMap::new();
+    let backends: HashMap<String, Backend> = HashMap::new();
     let backends: &'static _ = Box::leak(Box::new(backends));
 
     let id_remapper = IdRemapper::new();

@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::audit::db::AuditEntry;
 use crate::auth::jwt::CallerIdentity;
 use crate::auth::rbac::{is_tool_allowed, Permission};
-use crate::backend::HttpBackend;
+use crate::backend::Backend;
 use crate::catalog::ToolCatalog;
 use crate::config::types::{KillSwitchConfig, RbacConfig};
 use crate::health::circuit_breaker::CircuitBreaker;
@@ -33,7 +33,7 @@ pub async fn run_dispatch(
     mut rx: mpsc::Receiver<String>,
     tx: mpsc::Sender<String>,
     catalog: &ToolCatalog,
-    backends: &HashMap<String, HttpBackend>,
+    backends: &HashMap<String, Backend>,
     id_remapper: &IdRemapper,
     caller: Option<CallerIdentity>,
     rbac_config: &RbacConfig,
@@ -390,7 +390,7 @@ async fn handle_tools_call(
     client_id: JsonRpcId,
     params: Option<serde_json::Value>,
     catalog: &ToolCatalog,
-    backends: &HashMap<String, HttpBackend>,
+    backends: &HashMap<String, Backend>,
     id_remapper: &IdRemapper,
     circuit_breakers: &HashMap<String, CircuitBreaker>,
 ) -> JsonRpcResponse {

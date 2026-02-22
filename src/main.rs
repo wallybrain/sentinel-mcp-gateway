@@ -9,7 +9,7 @@ use tokio_util::sync::CancellationToken;
 
 use sentinel_gateway::audit;
 use sentinel_gateway::auth::jwt::{CallerIdentity, JwtValidator};
-use sentinel_gateway::backend::{build_http_client, discover_tools, HttpBackend};
+use sentinel_gateway::backend::{build_http_client, discover_tools, Backend, HttpBackend};
 use sentinel_gateway::config::types::BackendType;
 use sentinel_gateway::health::checker::health_checker;
 use sentinel_gateway::health::circuit_breaker::CircuitBreaker;
@@ -42,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Build shared HTTP client and discover backends
     let mut catalog = sentinel_gateway::catalog::ToolCatalog::new();
-    let mut backends_map: HashMap<String, HttpBackend> = HashMap::new();
+    let mut backends_map: HashMap<String, Backend> = HashMap::new();
     let mut discovery_succeeded = false;
 
     let http_backends: Vec<_> = config
@@ -66,7 +66,7 @@ async fn main() -> anyhow::Result<()> {
                         Ok(tools) => {
                             let tool_count = tools.len();
                             catalog.register_backend(&backend_config.name, tools);
-                            backends_map.insert(backend_config.name.clone(), backend);
+                            backends_map.insert(backend_config.name.clone(), Backend::Http(backend));
                             discovery_succeeded = true;
                             tracing::info!(
                                 name = %backend_config.name,
@@ -215,7 +215,10 @@ async fn main() -> anyhow::Result<()> {
     // Spawn health checker
     let backends_list: Vec<(String, HttpBackend)> = backends_map
         .iter()
-        .map(|(name, backend)| (name.clone(), backend.clone()))
+        .filter_map(|(name, backend)| match backend {
+            Backend::Http(h) => Some((name.clone(), h.clone())),
+            _ => None,
+        })
         .collect();
     tokio::spawn(health_checker(
         backends_list,
