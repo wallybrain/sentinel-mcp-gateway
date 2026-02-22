@@ -16,8 +16,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Authorization
 
 - [x] **AUTHZ-01**: Gateway enforces per-tool, per-role permissions defined in TOML config
-- [ ] **AUTHZ-02**: `tools/list` responses are filtered by caller's role — users only see tools they can call
-- [ ] **AUTHZ-03**: `tools/call` requests are rejected if caller's role lacks permission for the requested tool
+- [x] **AUTHZ-02**: `tools/list` responses are filtered by caller's role — users only see tools they can call
+- [x] **AUTHZ-03**: `tools/call` requests are rejected if caller's role lacks permission for the requested tool
 
 ### Routing
 

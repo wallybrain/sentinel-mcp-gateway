@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 4 in progress -- JWT & RBAC modules complete, integration next |
+| Current Focus | Phase 4 complete -- JWT auth + RBAC integrated into dispatch loop |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -14,15 +14,15 @@
 | Field | Value |
 |-------|-------|
 | Phase | 04-authentication-authorization |
-| Plan | 04-01 (complete) |
-| Status | Phase 4 plan 1 complete (1/? plans) |
+| Plan | 04-02 (complete) |
+| Status | Phase 4 complete (2/2 plans) |
 
 **Overall Progress:**
 ```
 Phase  1 [x] Foundation & Config (2/2 plans)
 Phase  2 [x] MCP Protocol Layer (2/2 plans)
 Phase  3 [x] HTTP Backend Routing (2/2 plans)
-Phase  4 [~] Authentication & Authorization (1/? plans)
+Phase  4 [x] Authentication & Authorization (2/2 plans)
 Phase  5 [ ] Audit Logging
 Phase  6 [ ] Rate Limiting & Kill Switch
 Phase  7 [ ] Health & Reliability
@@ -35,10 +35,10 @@ Phase 10 [ ] Deployment & Integration
 
 | Metric | Value |
 |--------|-------|
-| Phases completed | 3/10 |
-| Plans completed | 7/? |
-| Requirements completed | 17/47 |
-| Session count | 5 |
+| Phases completed | 4/10 |
+| Plans completed | 8/? |
+| Requirements completed | 19/47 |
+| Session count | 6 |
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -47,6 +47,7 @@ Phase 10 [ ] Deployment & Integration
 | 03 | 01 | 5min | 2 | 9 |
 | 03 | 02 | 4min | 2 | 6 |
 | 04 | 01 | 4min | 2 | 6 |
+| 04 | 02 | 4min | 2 | 3 |
 
 ## Accumulated Context
 
@@ -70,6 +71,9 @@ Phase 10 [ ] Deployment & Integration
 - jsonwebtoken 10.x requires explicit rust_crypto feature (default-features panics at runtime)
 - AuthError maps all variants to JSON-RPC -32001 for consistent error handling
 - tools.execute implies tools.read (single is_tool_allowed function for both list and call)
+- CallerIdentity passed to run_dispatch (not JwtValidator) for testability and separation of concerns
+- JWT validation in main.rs, RBAC enforcement in gateway.rs
+- AUTHZ_ERROR is -32003 (distinct from -32001 auth and -32002 not-initialized)
 
 ### Known Gotchas
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -85,16 +89,16 @@ Phase 10 [ ] Deployment & Integration
 - None
 
 ### TODOs
-- Execute Phase 4 Plan 2 (auth integration into dispatch loop)
+- Plan Phase 5 (Audit Logging)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 04-01-PLAN.md -- JWT validation (JwtValidator, Claims, AuthError) and RBAC (is_tool_allowed, Permission), 16 new tests (76 total)
-- **Stopped at:** Completed 04-01-PLAN.md
-- **Next step:** Execute Phase 4 Plan 2 (auth integration into dispatch loop)
+- **What happened:** Executed 04-02-PLAN.md -- wired auth into dispatch loop (CallerIdentity + RBAC filtering), 9 new integration tests (85 total)
+- **Stopped at:** Completed 04-02-PLAN.md (Phase 4 complete)
+- **Next step:** Plan Phase 5 (Audit Logging)
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22T04:08Z*
+*Last updated: 2026-02-22T04:15Z*
