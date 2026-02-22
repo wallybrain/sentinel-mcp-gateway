@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use rmcp::model::ListToolsResult;
 use serde_json::json;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::audit::db::AuditEntry;
@@ -11,10 +12,11 @@ use crate::auth::rbac::{is_tool_allowed, Permission};
 use crate::backend::HttpBackend;
 use crate::catalog::ToolCatalog;
 use crate::config::types::{KillSwitchConfig, RbacConfig};
+use crate::health::circuit_breaker::CircuitBreaker;
 use crate::protocol::id_remapper::IdRemapper;
 use crate::protocol::jsonrpc::{
-    JsonRpcId, JsonRpcRequest, JsonRpcResponse, INTERNAL_ERROR, INVALID_PARAMS, KILL_SWITCH_ERROR,
-    METHOD_NOT_FOUND, PARSE_ERROR, RATE_LIMIT_ERROR,
+    JsonRpcId, JsonRpcRequest, JsonRpcResponse, CIRCUIT_OPEN_ERROR, INTERNAL_ERROR, INVALID_PARAMS,
+    KILL_SWITCH_ERROR, METHOD_NOT_FOUND, PARSE_ERROR, RATE_LIMIT_ERROR,
 };
 use crate::protocol::mcp::{handle_initialize, McpState};
 use crate::ratelimit::RateLimiter;
@@ -38,6 +40,8 @@ pub async fn run_dispatch(
     audit_tx: Option<mpsc::Sender<AuditEntry>>,
     rate_limiter: &RateLimiter,
     kill_switch: &KillSwitchConfig,
+    circuit_breakers: &HashMap<String, CircuitBreaker>,
+    cancel: CancellationToken,
 ) -> anyhow::Result<()> {
     let caller = caller.unwrap_or_else(|| CallerIdentity {
         subject: "admin".to_string(),
@@ -47,7 +51,18 @@ pub async fn run_dispatch(
 
     let mut state = McpState::Created;
 
-    while let Some(line) = rx.recv().await {
+    loop {
+        let line = tokio::select! {
+            line = rx.recv() => match line {
+                Some(l) => l,
+                None => break,
+            },
+            _ = cancel.cancelled() => {
+                tracing::info!("Dispatch loop cancelled by shutdown signal");
+                break;
+            }
+        };
+
         let request: JsonRpcRequest = match serde_json::from_str(&line) {
             Ok(req) => req,
             Err(e) => {
@@ -273,9 +288,43 @@ pub async fn run_dispatch(
 
                             continue;
                         }
+
+                        // Circuit breaker check
+                        if let Some(backend_name) = catalog.route(name) {
+                            if let Some(cb) = circuit_breakers.get(backend_name) {
+                                if !cb.allow_request() {
+                                    let resp = JsonRpcResponse::error(
+                                        id.clone(),
+                                        CIRCUIT_OPEN_ERROR,
+                                        format!("Backend circuit open: {backend_name}"),
+                                    );
+                                    send_response(&tx, &resp).await;
+
+                                    if let Some(ref atx) = audit_tx {
+                                        let entry = AuditEntry {
+                                            request_id,
+                                            timestamp: chrono::Utc::now(),
+                                            client_subject: caller.subject.clone(),
+                                            client_role: caller.role.clone(),
+                                            tool_name: name.to_string(),
+                                            backend_name: backend_name.to_string(),
+                                            request_args: request.params.clone(),
+                                            response_status: "circuit_open".to_string(),
+                                            error_message: Some(format!("Backend circuit open: {backend_name}")),
+                                            latency_ms: 0,
+                                        };
+                                        if let Err(e) = atx.try_send(entry) {
+                                            tracing::warn!(error = %e, "Audit channel full, dropping entry");
+                                        }
+                                    }
+
+                                    continue;
+                                }
+                            }
+                        }
                     }
                     let resp =
-                        handle_tools_call(id, request.params.clone(), catalog, backends, id_remapper)
+                        handle_tools_call(id, request.params.clone(), catalog, backends, id_remapper, circuit_breakers)
                             .await;
                     let latency_ms = start.elapsed().as_millis() as i64;
 
@@ -343,6 +392,7 @@ async fn handle_tools_call(
     catalog: &ToolCatalog,
     backends: &HashMap<String, HttpBackend>,
     id_remapper: &IdRemapper,
+    circuit_breakers: &HashMap<String, CircuitBreaker>,
 ) -> JsonRpcResponse {
     // Extract tool name from params
     let tool_name = match params
@@ -404,6 +454,10 @@ async fn handle_tools_call(
     // Send to backend
     match backend.send(&body).await {
         Ok(response_str) => {
+            // Record success with circuit breaker
+            if let Some(cb) = circuit_breakers.get(&backend_name) {
+                cb.record_success();
+            }
             // Parse response and restore original ID
             match serde_json::from_str::<JsonRpcResponse>(&response_str) {
                 Ok(mut backend_resp) => {
@@ -428,6 +482,10 @@ async fn handle_tools_call(
             }
         }
         Err(e) => {
+            // Record failure with circuit breaker
+            if let Some(cb) = circuit_breakers.get(&backend_name) {
+                cb.record_failure();
+            }
             // Restore ID on error
             let original = id_remapper
                 .restore(gateway_id)

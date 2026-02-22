@@ -9,8 +9,10 @@ use sentinel_gateway::backend::HttpBackend;
 use sentinel_gateway::catalog::create_stub_catalog;
 use sentinel_gateway::config::types::{KillSwitchConfig, RateLimitConfig, RbacConfig, RoleConfig};
 use sentinel_gateway::gateway::run_dispatch;
+use sentinel_gateway::health::circuit_breaker::CircuitBreaker;
 use sentinel_gateway::protocol::id_remapper::IdRemapper;
 use sentinel_gateway::ratelimit::RateLimiter;
+use tokio_util::sync::CancellationToken;
 
 fn default_admin_rbac() -> RbacConfig {
     let mut roles = HashMap::new();
@@ -98,13 +100,18 @@ async fn spawn_dispatch_with_config(
     let id_remapper = IdRemapper::new();
     let id_remapper: &'static _ = Box::leak(Box::new(id_remapper));
 
+    let circuit_breakers: HashMap<String, CircuitBreaker> = HashMap::new();
+    let circuit_breakers: &'static _ = Box::leak(Box::new(circuit_breakers));
+
+    let cancel = CancellationToken::new();
+
     let (in_tx, in_rx) = mpsc::channel::<String>(64);
     let (out_tx, out_rx) = mpsc::channel::<String>(64);
 
     tokio::spawn(async move {
         let _ = run_dispatch(
             in_rx, out_tx, catalog, backends, id_remapper, caller, rbac, None,
-            rate_limiter, kill_switch,
+            rate_limiter, kill_switch, circuit_breakers, cancel,
         )
         .await;
     });
@@ -368,13 +375,18 @@ async fn test_tools_call_backend_not_in_map_returns_internal_error() {
     let kill_switch = KillSwitchConfig::default();
     let kill_switch: &'static _ = Box::leak(Box::new(kill_switch));
 
+    let circuit_breakers: HashMap<String, CircuitBreaker> = HashMap::new();
+    let circuit_breakers: &'static _ = Box::leak(Box::new(circuit_breakers));
+
+    let cancel = CancellationToken::new();
+
     let (in_tx, in_rx) = mpsc::channel::<String>(64);
     let (out_tx, mut out_rx) = mpsc::channel::<String>(64);
 
     tokio::spawn(async move {
         let _ = run_dispatch(
             in_rx, out_tx, catalog, backends, id_remapper, None, rbac, None,
-            rate_limiter, kill_switch,
+            rate_limiter, kill_switch, circuit_breakers, cancel,
         )
         .await;
     });

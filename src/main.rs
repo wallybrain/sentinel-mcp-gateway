@@ -1,12 +1,19 @@
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
 
 use clap::Parser;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
+use tokio::signal::unix::{signal, SignalKind};
+use tokio_util::sync::CancellationToken;
 
 use sentinel_gateway::audit;
 use sentinel_gateway::auth::jwt::{CallerIdentity, JwtValidator};
 use sentinel_gateway::backend::{build_http_client, discover_tools, HttpBackend};
 use sentinel_gateway::config::types::BackendType;
+use sentinel_gateway::health::checker::health_checker;
+use sentinel_gateway::health::circuit_breaker::CircuitBreaker;
+use sentinel_gateway::health::server::{run_health_server, BackendHealth, BackendHealthMap};
 use sentinel_gateway::protocol::id_remapper::IdRemapper;
 use sentinel_gateway::ratelimit::RateLimiter;
 
@@ -123,30 +130,99 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Audit logging initialization
-    let audit_tx = if config.gateway.audit_enabled {
+    let (audit_tx, audit_handle) = if config.gateway.audit_enabled {
         match std::env::var(&config.postgres.url_env) {
             Ok(url) if !url.is_empty() => {
                 let pool = audit::db::create_pool(&url, config.postgres.max_connections).await?;
                 audit::db::run_migrations(&pool).await?;
                 let (atx, arx) = mpsc::channel::<audit::db::AuditEntry>(1024);
-                tokio::spawn(audit::writer::audit_writer(pool, arx));
+                let handle = tokio::spawn(audit::writer::audit_writer(pool, arx));
                 tracing::info!("Audit logging enabled (Postgres)");
-                Some(atx)
+                (Some(atx), Some(handle))
             }
             _ => {
                 tracing::warn!(
                     env_var = %config.postgres.url_env,
                     "Postgres URL not set, audit logging disabled"
                 );
-                None
+                (None, None)
             }
         }
     } else {
         tracing::info!("Audit logging disabled");
-        None
+        (None, None)
     };
 
     let rate_limiter = RateLimiter::new(&config.rate_limits);
+
+    // Initialize shared health state (optimistic start: all discovered backends healthy)
+    let health_map: BackendHealthMap = Arc::new(RwLock::new(HashMap::new()));
+    {
+        let mut map = health_map.write().await;
+        for name in backends_map.keys() {
+            map.insert(
+                name.clone(),
+                BackendHealth {
+                    healthy: true,
+                    last_check: std::time::Instant::now(),
+                    consecutive_failures: 0,
+                },
+            );
+        }
+    }
+
+    // Create per-backend circuit breakers
+    let circuit_breakers: HashMap<String, CircuitBreaker> = config
+        .backends
+        .iter()
+        .filter(|b| backends_map.contains_key(&b.name))
+        .map(|b| {
+            (
+                b.name.clone(),
+                CircuitBreaker::new(
+                    b.circuit_breaker_threshold,
+                    Duration::from_secs(b.circuit_breaker_recovery_secs),
+                ),
+            )
+        })
+        .collect();
+
+    // Create CancellationToken for graceful shutdown
+    let cancel = CancellationToken::new();
+
+    // Spawn signal handler
+    let cancel_signal = cancel.clone();
+    tokio::spawn(async move {
+        let mut sigterm = signal(SignalKind::terminate()).expect("SIGTERM handler");
+        let mut sigint = signal(SignalKind::interrupt()).expect("SIGINT handler");
+        tokio::select! {
+            _ = sigterm.recv() => tracing::info!("Received SIGTERM"),
+            _ = sigint.recv() => tracing::info!("Received SIGINT"),
+        }
+        cancel_signal.cancel();
+    });
+
+    // Spawn health HTTP server
+    let health_addr = config.gateway.health_listen.clone();
+    let health_map_server = health_map.clone();
+    let cancel_server = cancel.clone();
+    tokio::spawn(async move {
+        if let Err(e) = run_health_server(&health_addr, health_map_server, cancel_server).await {
+            tracing::error!(error = %e, "Health server exited with error");
+        }
+    });
+
+    // Spawn health checker
+    let backends_list: Vec<(String, HttpBackend)> = backends_map
+        .iter()
+        .map(|(name, backend)| (name.clone(), backend.clone()))
+        .collect();
+    tokio::spawn(health_checker(
+        backends_list,
+        health_map.clone(),
+        cancel.clone(),
+        30,
+    ));
 
     let (inbound_tx, inbound_rx) = mpsc::channel::<String>(64);
     let (outbound_tx, outbound_rx) = mpsc::channel::<String>(64);
@@ -154,6 +230,7 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(sentinel_gateway::transport::stdio::stdio_reader(inbound_tx));
     tokio::spawn(sentinel_gateway::transport::stdio::stdio_writer(outbound_rx));
 
+    let dispatch_audit_tx = audit_tx.clone();
     sentinel_gateway::gateway::run_dispatch(
         inbound_rx,
         outbound_tx,
@@ -162,12 +239,25 @@ async fn main() -> anyhow::Result<()> {
         &id_remapper,
         caller,
         &config.rbac,
-        audit_tx,
+        dispatch_audit_tx,
         &rate_limiter,
         &config.kill_switch,
+        &circuit_breakers,
+        cancel.clone(),
     )
     .await?;
 
-    tracing::info!("Dispatch loop ended (stdin closed)");
+    // Ordered shutdown sequence
+    cancel.cancel();
+
+    // Drop audit_tx to signal the writer to drain
+    drop(audit_tx);
+
+    // Wait for audit writer to finish draining
+    if let Some(handle) = audit_handle {
+        let _ = handle.await;
+    }
+
+    tracing::info!("Shutdown complete");
     Ok(())
 }

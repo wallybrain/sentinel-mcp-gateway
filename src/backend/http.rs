@@ -23,6 +23,7 @@ pub fn build_http_client() -> Result<Client, reqwest::Error> {
 }
 
 /// HTTP backend that POSTs JSON-RPC to an MCP server.
+#[derive(Clone)]
 pub struct HttpBackend {
     client: Client,
     url: String,
