@@ -21,7 +21,7 @@ Requirements for Deploy & Harden milestone. Each maps to roadmap phases.
 - [x] **CUT-02**: Sentinel handles MCP traffic via stdio transport (native binary) and serves health/metrics on port 9201
 - [x] **CUT-03**: Claude Code MCP config updated with new Sentinel entry and fresh JWT token
 - [x] **CUT-04**: All active backends respond to tool calls through Sentinel with durable env wiring (6 of 7; exa deferred to v1.2+ pending EXA_API_KEY)
-- [ ] **CUT-05**: Rollback procedure is documented and tested (restart ContextForge, revert MCP config)
+- [x] **CUT-05**: Rollback procedure is documented and tested (ContextForge containers start and serve, Sentinel restored after reversal)
 
 ### Network Hardening
 
@@ -90,7 +90,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CUT-02 | Phase 11 | Complete |
 | CUT-03 | Phase 11 | Complete |
 | CUT-04 | Phase 15 (gap closure) | Done |
-| CUT-05 | Phase 15 (gap closure) | Pending |
+| CUT-05 | Phase 15 (gap closure) | Done |
 | NET-01 | Phase 12 | Complete |
 | NET-02 | Phase 12 | Complete |
 | NET-03 | Phase 12 | Complete |
