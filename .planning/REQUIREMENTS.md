@@ -78,8 +78,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Observability
 
-- [ ] **OBS-01**: Gateway exposes `/metrics` endpoint with Prometheus-compatible metrics
-- [ ] **OBS-02**: Metrics include: request count, latency histogram, error rate, backend health, rate limit hits per tool
+- [x] **OBS-01**: Gateway exposes `/metrics` endpoint with Prometheus-compatible metrics
+- [x] **OBS-02**: Metrics include: request count, latency histogram, error rate, backend health, rate limit hits per tool
 - [ ] **OBS-03**: Gateway validates tool call arguments against cached JSON schemas from `tools/list`
 - [ ] **OBS-04**: Invalid arguments are rejected at the gateway with descriptive JSON-RPC error before reaching backend
 
@@ -179,8 +179,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONFIG-02 | Phase 1 | Complete |
 | CONFIG-03 | Phase 9 | Pending |
 | CONFIG-04 | Phase 1 | Complete |
-| OBS-01 | Phase 9 | Pending |
-| OBS-02 | Phase 9 | Pending |
+| OBS-01 | Phase 9 | Complete |
+| OBS-02 | Phase 9 | Complete |
 | OBS-03 | Phase 9 | Pending |
 | OBS-04 | Phase 9 | Pending |
 | DEPLOY-01 | Phase 1 | Complete |

@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Core Value | Every MCP tool call passes through one governed point with auth, audit, and rate limiting |
-| Current Focus | Phase 8 COMPLETE -- stdio backends fully integrated as first-class citizens |
+| Current Focus | Phase 9 in progress -- Prometheus metrics module and /metrics endpoint complete |
 | Language | Rust |
 | Deployment | Docker Compose (gateway + Postgres) |
 
@@ -14,8 +14,8 @@
 | Field | Value |
 |-------|-------|
 | Phase | 09-observability |
-| Plan | 01 |
-| Status | Phase 8 complete (3/3 plans), starting Phase 9 |
+| Plan | 02 |
+| Status | Phase 9 plan 01 complete, continuing Phase 9 |
 
 **Overall Progress:**
 ```
@@ -27,7 +27,7 @@ Phase  5 [x] Audit Logging (2/2 plans)
 Phase  6 [x] Rate Limiting & Kill Switch (2/2 plans)
 Phase  7 [x] Health & Reliability (2/2 plans)
 Phase  8 [x] stdio Backend Management (3/3 plans)
-Phase  9 [ ] Observability & Hot Reload
+Phase  9 [ ] Observability & Hot Reload (1/? plans)
 Phase 10 [ ] Deployment & Integration
 ```
 
@@ -36,8 +36,8 @@ Phase 10 [ ] Deployment & Integration
 | Metric | Value |
 |--------|-------|
 | Phases completed | 8/10 |
-| Plans completed | 17/? |
-| Requirements completed | 41/47 |
+| Plans completed | 18/? |
+| Requirements completed | 43/47 |
 | Session count | 7 |
 
 | Phase | Plan | Duration | Tasks | Files |
@@ -57,6 +57,7 @@ Phase 10 [ ] Deployment & Integration
 | 08 | 01 | 3min | 2 | 4 |
 | 08 | 02 | 12min | 2 | 2 |
 | 08 | 03 | 8min | 2 | 7 |
+| 09 | 01 | 6min | 2 | 4 |
 
 ## Accumulated Context
 
@@ -112,6 +113,8 @@ Phase 10 [ ] Deployment & Integration
 - CancellationToken created early for stdio supervisor access
 - 30s timeout for initial stdio backend tool discovery (supervisor retries in background)
 - 5s timeout for supervisor shutdown during ordered shutdown sequence
+- Explicit prometheus::Registry (not default_registry) for test isolation
+- HealthAppState struct combines BackendHealthMap + Option<Arc<Metrics>> for axum state
 
 ### Known Gotchas
 - Rust builds require `dangerouslyDisableSandbox: true` (bwrap loopback error)
@@ -122,21 +125,22 @@ Phase 10 [ ] Deployment & Integration
 - Pre-install npm packages globally (never use npx in production)
 - SSE client disconnect is NOT cancellation per MCP spec
 - Auth bypass pitfall: RBAC must filter both tools/list AND tools/call
+- Prometheus only includes metric families in gather output after first observation
 
 ### Blockers
 - None
 
 ### TODOs
-- Execute Phase 9 (Observability & Hot Reload)
+- Execute Phase 9 remaining plans (02, 03)
 
 ## Session Continuity
 
 ### Last Session
 - **Date:** 2026-02-22
-- **What happened:** Executed 08-03-PLAN.md -- Backend enum, gateway dispatch refactor, stdio startup in main.rs, 3 integration tests (125 total), Phase 8 COMPLETE
-- **Stopped at:** Completed 08-03-PLAN.md (Phase 8: 3/3 plans complete)
-- **Next step:** Execute Phase 9 (Observability & Hot Reload)
+- **What happened:** Executed 09-01-PLAN.md -- Prometheus metrics module (5 metric families, sentinel_* prefix) and /metrics endpoint on health server
+- **Stopped at:** Completed 09-01-PLAN.md (Phase 9: 1/? plans complete)
+- **Next step:** Execute Phase 9 plan 02
 
 ---
 *State initialized: 2026-02-22*
-*Last updated: 2026-02-22T07:02Z*
+*Last updated: 2026-02-22T07:46Z*

@@ -149,7 +149,7 @@ Plans:
   5. Kill switch changes applied via hot reload take effect immediately on the next request
 **Plans:** 3 plans
 Plans:
-- [ ] 09-01-PLAN.md -- Prometheus metrics module and /metrics endpoint on health server
+- [x] 09-01-PLAN.md -- Prometheus metrics module and /metrics endpoint on health server
 - [ ] 09-02-PLAN.md -- Schema validation module and hot-reloadable config struct
 - [ ] 09-03-PLAN.md -- Wire metrics, validation, and hot reload into gateway dispatch and main.rs
 
@@ -176,7 +176,7 @@ Plans:
 | 6. Rate Limiting & Kill Switch | 2/2 | Complete    | 2026-02-22 |
 | 7. Health & Reliability | 2/2 | Complete    | 2026-02-22 |
 | 8. stdio Backend Management | 3/3 | Complete    | 2026-02-22 |
-| 9. Observability & Hot Reload | 0/3 | Not started | - |
+| 9. Observability & Hot Reload | 1/3 | In progress | - |
 | 10. Deployment & Integration | 0/? | Not started | - |
 
 ---
