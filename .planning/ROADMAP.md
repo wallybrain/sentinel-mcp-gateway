@@ -5,7 +5,7 @@
 ## Milestones
 
 - ✅ **v1.0 Sentinel Gateway MVP** -- Phases 1-9 (shipped 2026-02-22)
-- **v1.1 Deploy & Harden** -- Phases 10-14 (in progress)
+- **v1.1 Deploy & Harden** -- Phases 10-15 (in progress)
 
 ## Phases
 
@@ -36,6 +36,7 @@
 - [x] **Phase 12: Network Hardening** - Lock down 127.0.0.1 binding, iptables rules, clean stale networks (completed 2026-02-22)
 - [ ] **Phase 13: Monitoring Stack** - Prometheus + Grafana dashboard + n8n health checks with Discord alerts
 - [ ] **Phase 14: Operations** - Audit log rotation, backup integration, reboot resilience
+- [ ] **Phase 15: Cutover Gap Closure** - Fix audit gaps: rollback test, Firecrawl key wiring, config hardening, doc sync
 
 ## Phase Details
 
@@ -83,7 +84,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 12-01-PLAN.md -- Verify port binding, add iptables DROP rules, update fix-iptables.sh, remove stale Docker network
+- [x] 12-01-PLAN.md -- Verify port binding, add iptables DROP rules, update fix-iptables.sh, remove stale Docker network
 
 ### Phase 13: Monitoring Stack
 **Goal**: Sentinel metrics are visualized in Grafana and health failures trigger Discord alerts within minutes
@@ -114,10 +115,27 @@ Plans:
 Plans:
 - [ ] 14-01: TBD
 
+### Phase 15: Cutover Gap Closure
+**Goal**: All cutover audit gaps closed — rollback tested, env wiring durable, config explicit, docs accurate
+**Depends on**: Phase 12 (can run before or after 13/14)
+**Requirements**: CUT-01, CUT-04, CUT-05
+**Gap Closure**: Closes gaps from v1.1-MILESTONE-AUDIT.md
+**Success Criteria** (what must be TRUE):
+  1. Rollback procedure has been tested end-to-end (start ContextForge, verify MCP traffic, reverse)
+  2. FIRECRAWL_API_KEY is in the MCP env block in add-mcp.sh (durable wiring, not inherited env)
+  3. health_listen is explicit in sentinel.toml (not relying on hardcoded default)
+  4. Duplicate MCP registration removed (single scope in ~/.claude.json)
+  5. Orphaned sentinel-docker.toml removed
+  6. REQUIREMENTS.md checkboxes and text updated for CUT-01, CUT-04, CUT-05
+**Plans**: TBD
+
+Plans:
+- [ ] 15-01: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14
+Phases execute in numeric order: 10 -> 11 -> 12 -> 15 -> 13 -> 14
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -135,6 +153,7 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14
 | 12. Network Hardening | 1/1 | Complete    | 2026-02-22 | - |
 | 13. Monitoring Stack | v1.1 | 0/TBD | Not started | - |
 | 14. Operations | v1.1 | 0/TBD | Not started | - |
+| 15. Cutover Gap Closure | v1.1 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-22*

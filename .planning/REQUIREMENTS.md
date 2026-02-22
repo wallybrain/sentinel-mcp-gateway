@@ -20,7 +20,7 @@ Requirements for Deploy & Harden milestone. Each maps to roadmap phases.
 - [ ] **CUT-01**: ContextForge gateway process is stopped (containers preserved for rollback, not `docker compose down`)
 - [x] **CUT-02**: Sentinel handles MCP traffic via stdio transport (native binary) and serves health/metrics on port 9201
 - [x] **CUT-03**: Claude Code MCP config updated with new Sentinel entry and fresh JWT token
-- [ ] **CUT-04**: All 7 backends respond to tool calls through Sentinel (n8n, sqlite, context7, firecrawl, exa, playwright, sequential-thinking)
+- [ ] **CUT-04**: All active backends respond to tool calls through Sentinel with durable env wiring (6 of 7; exa deferred to v1.2+ pending EXA_API_KEY)
 - [ ] **CUT-05**: Rollback procedure is documented and tested (restart ContextForge, revert MCP config)
 
 ### Network Hardening
@@ -86,11 +86,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PREP-03 | Phase 10 | Done |
 | PREP-04 | Phase 10 | Done |
 | PREP-05 | Phase 10 | Done |
-| CUT-01 | Phase 11 | Pending |
+| CUT-01 | Phase 15 (gap closure) | Pending |
 | CUT-02 | Phase 11 | Complete |
 | CUT-03 | Phase 11 | Complete |
-| CUT-04 | Phase 11 | Pending |
-| CUT-05 | Phase 11 | Pending |
+| CUT-04 | Phase 15 (gap closure) | Pending |
+| CUT-05 | Phase 15 (gap closure) | Pending |
 | NET-01 | Phase 12 | Complete |
 | NET-02 | Phase 12 | Complete |
 | NET-03 | Phase 12 | Complete |
@@ -112,4 +112,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-22*
-*Last updated: 2026-02-22 after roadmap creation -- traceability complete*
+*Last updated: 2026-02-22 after milestone audit gap closure planning*
