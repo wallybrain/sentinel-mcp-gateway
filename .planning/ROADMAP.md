@@ -101,7 +101,7 @@ Plans:
   2. Rate limits are configurable per-tool in `sentinel.toml` with sensible defaults for unconfigured tools
   3. A tool marked as disabled in config returns a JSON-RPC error to callers (kill switch per tool)
   4. A backend marked as disabled in config causes all its tools to return JSON-RPC errors (kill switch per backend)
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 06-01-PLAN.md -- RateLimiter module with token bucket, error constants, and unit tests
 - [x] 06-02-PLAN.md -- Wire kill switch and rate limiting into dispatch loop with integration tests
@@ -162,7 +162,7 @@ Plans:
 | 3. HTTP Backend Routing | 2/2 | Complete | 2026-02-22 |
 | 4. Authentication & Authorization | 2/2 | Complete    | 2026-02-22 |
 | 5. Audit Logging | 2/2 | Complete    | 2026-02-22 |
-| 6. Rate Limiting & Kill Switch | 2/2 | Complete | 2026-02-22 |
+| 6. Rate Limiting & Kill Switch | 2/2 | Complete    | 2026-02-22 |
 | 7. Health & Reliability | 0/? | Not started | - |
 | 8. stdio Backend Management | 0/? | Not started | - |
 | 9. Observability & Hot Reload | 0/? | Not started | - |
