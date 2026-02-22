@@ -9,11 +9,11 @@ Requirements for Deploy & Harden milestone. Each maps to roadmap phases.
 
 ### Pre-Cutover Preparation
 
-- [ ] **PREP-01**: Port config is consistent across sentinel.toml, Dockerfile, and docker-compose.yml (resolve 9200/9201 drift)
-- [ ] **PREP-02**: Sidecar service definitions (mcp-n8n, mcp-sqlite) are migrated from ContextForge compose to Sentinel compose
-- [ ] **PREP-03**: Sentinel containers join a Docker network that can reach HTTP backends (mcp-n8n, mcp-sqlite) by hostname
-- [ ] **PREP-04**: Production .env file exists with JWT secret and Postgres credentials (not committed)
-- [ ] **PREP-05**: Sentinel containers start and pass health checks alongside running ContextForge
+- [x] **PREP-01**: Port config is consistent across sentinel.toml, Dockerfile, and docker-compose.yml (resolve 9200/9201 drift)
+- [x] **PREP-02**: Sidecar service definitions (mcp-n8n, mcp-sqlite) are migrated from ContextForge compose to Sentinel compose
+- [x] **PREP-03**: Sentinel containers join a Docker network that can reach HTTP backends (mcp-n8n, mcp-sqlite) by hostname
+- [x] **PREP-04**: Production .env file exists with JWT secret and Postgres credentials (not committed)
+- [x] **PREP-05**: Sentinel containers start and pass health checks alongside running ContextForge
 
 ### Cutover
 
@@ -81,11 +81,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PREP-01 | Phase 10 | Pending |
-| PREP-02 | Phase 10 | Pending |
-| PREP-03 | Phase 10 | Pending |
-| PREP-04 | Phase 10 | Pending |
-| PREP-05 | Phase 10 | Pending |
+| PREP-01 | Phase 10 | Done |
+| PREP-02 | Phase 10 | Done |
+| PREP-03 | Phase 10 | Done |
+| PREP-04 | Phase 10 | Done |
+| PREP-05 | Phase 10 | Done |
 | CUT-01 | Phase 11 | Pending |
 | CUT-02 | Phase 11 | Pending |
 | CUT-03 | Phase 11 | Pending |

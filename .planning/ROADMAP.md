@@ -31,7 +31,7 @@
 
 **Milestone Goal:** Replace ContextForge with Sentinel on the VPS, add monitoring and network hardening.
 
-- [ ] **Phase 10: Pre-Cutover Preparation** - Fix port drift, migrate sidecars, deploy Sentinel alongside ContextForge
+- [x] **Phase 10: Pre-Cutover Preparation** - Fix port drift, migrate sidecars, deploy Sentinel alongside ContextForge
 - [ ] **Phase 11: Cutover Execution** - Stop ContextForge, bind Sentinel to port 9200, verify all 7 backends
 - [ ] **Phase 12: Network Hardening** - Lock down 127.0.0.1 binding, iptables rules, clean stale networks
 - [ ] **Phase 13: Monitoring Stack** - Prometheus + Grafana dashboard + n8n health checks with Discord alerts
@@ -52,8 +52,8 @@
 **Plans**: 2 plans
 
 Plans:
-- [ ] 10-01-PLAN.md -- Port fix, sidecar migration, Docker networking, production .env
-- [ ] 10-02-PLAN.md -- Build and start Sentinel stack alongside ContextForge, verify health
+- [x] 10-01-PLAN.md -- Port fix, sidecar migration, Docker networking, production .env
+- [x] 10-02-PLAN.md -- Build and start Sentinel stack alongside ContextForge, verify health
 
 ### Phase 11: Cutover Execution
 **Goal**: Sentinel is the live MCP gateway on port 9200 with all 7 backends verified and rollback tested
@@ -130,7 +130,7 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14
 | 7. Health & Reliability | v1.0 | 2/2 | Complete | 2026-02-22 |
 | 8. stdio Backend Management | v1.0 | 3/3 | Complete | 2026-02-22 |
 | 9. Observability & Hot Reload | v1.0 | 3/3 | Complete | 2026-02-22 |
-| 10. Pre-Cutover Preparation | v1.1 | 0/TBD | Not started | - |
+| 10. Pre-Cutover Preparation | v1.1 | 2/2 | Complete | 2026-02-22 |
 | 11. Cutover Execution | v1.1 | 0/TBD | Not started | - |
 | 12. Network Hardening | v1.1 | 0/TBD | Not started | - |
 | 13. Monitoring Stack | v1.1 | 0/TBD | Not started | - |
@@ -138,4 +138,4 @@ Phases execute in numeric order: 10 -> 11 -> 12 -> 13 -> 14
 
 ---
 *Roadmap created: 2026-02-22*
-*Last updated: 2026-02-22 after v1.1 roadmap creation*
+*Last updated: 2026-02-22 after Phase 10 completion*
