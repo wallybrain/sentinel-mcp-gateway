@@ -4,7 +4,6 @@ use std::time::Instant;
 
 use axum::extract::State;
 use axum::http::{header, StatusCode};
-use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Json, Router};
 use serde_json::{json, Value};
