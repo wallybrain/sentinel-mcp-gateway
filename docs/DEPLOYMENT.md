@@ -118,6 +118,8 @@ print(f'{header}.{payload}.{sig}')
 
 Paste the output into `.env` as `SENTINEL_TOKEN=<token>`.
 
+**Important**: The Rust gateway uses the JWT secret as raw bytes (`secret.as_bytes()`), not base64-decoded. The Python snippet above matches this behavior. Do not base64-encode or decode the secret.
+
 ### 4. Configure Backends
 
 Edit `sentinel.toml` and uncomment the backends you want. See [sentinel.toml.example](../sentinel.toml.example) for all options.
@@ -277,6 +279,16 @@ default_rpm = 100
 [rate_limits.per_tool]
 expensive_operation = 10
 ```
+
+### Hot Reload
+
+Send SIGHUP to reload `kill_switch` and `rate_limits` without restarting:
+
+```bash
+kill -HUP $(pgrep sentinel-gateway)
+```
+
+Changes to backends, auth, or postgres config require a full restart.
 
 ### Audit Logging
 
