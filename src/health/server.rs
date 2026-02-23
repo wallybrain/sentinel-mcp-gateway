@@ -14,6 +14,16 @@ use tokio_util::sync::CancellationToken;
 
 use crate::metrics::Metrics;
 
+fn constant_time_eq(a: &str, b: &str) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.bytes()
+        .zip(b.bytes())
+        .fold(0u8, |acc, (x, y)| acc | (x ^ y))
+        == 0
+}
+
 pub struct BackendHealth {
     pub healthy: bool,
     pub last_check: Instant,
@@ -26,6 +36,8 @@ pub type BackendHealthMap = Arc<RwLock<HashMap<String, BackendHealth>>>;
 pub struct HealthAppState {
     pub health_map: BackendHealthMap,
     pub metrics: Option<Arc<Metrics>>,
+    /// Bearer token for /metrics endpoint auth (env: HEALTH_TOKEN).
+    /// Does NOT protect /health or /ready — only /metrics.
     pub health_token: Option<String>,
 }
 
@@ -54,37 +66,41 @@ async fn readiness(State(state): State<HealthAppState>) -> (StatusCode, Json<Val
 async fn metrics_handler(
     State(state): State<HealthAppState>,
     headers: axum::http::HeaderMap,
-) -> impl IntoResponse {
+) -> axum::response::Response {
+    use axum::response::Response;
+    use axum::body::Body;
+
     if let Some(ref expected) = state.health_token {
         let provided = headers
             .get(header::AUTHORIZATION)
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.strip_prefix("Bearer "));
         match provided {
-            Some(token) if token == expected => {}
+            Some(token) if constant_time_eq(token, expected) => {}
             _ => {
-                return (
-                    StatusCode::UNAUTHORIZED,
-                    [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-                    "Unauthorized".to_string(),
-                )
+                return Response::builder()
+                    .status(StatusCode::UNAUTHORIZED)
+                    .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+                    .header(header::WWW_AUTHENTICATE, "Bearer")
+                    .body(Body::from("Unauthorized"))
+                    .unwrap();
             }
         }
     }
     match &state.metrics {
-        Some(m) => (
-            StatusCode::OK,
-            [(
+        Some(m) => Response::builder()
+            .status(StatusCode::OK)
+            .header(
                 header::CONTENT_TYPE,
                 "text/plain; version=0.0.4; charset=utf-8",
-            )],
-            m.gather_text(),
-        ),
-        None => (
-            StatusCode::NOT_FOUND,
-            [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-            "Metrics not enabled".to_string(),
-        ),
+            )
+            .body(Body::from(m.gather_text()))
+            .unwrap(),
+        None => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+            .body(Body::from("Metrics not enabled"))
+            .unwrap(),
     }
 }
 

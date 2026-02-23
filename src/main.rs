@@ -295,6 +295,11 @@ async fn main() -> anyhow::Result<()> {
     let cancel_server = cancel.clone();
     tokio::spawn(async move {
         let health_token = std::env::var("HEALTH_TOKEN").ok();
+        if health_token.is_some() {
+            tracing::info!("Metrics endpoint auth enabled (HEALTH_TOKEN set)");
+        } else {
+            tracing::warn!("Metrics endpoint is unauthenticated (HEALTH_TOKEN not set)");
+        }
         if let Err(e) = run_health_server(&health_addr, health_map_server, Some(metrics_server), health_token, cancel_server).await {
             tracing::error!(error = %e, "Health server exited with error");
         }
