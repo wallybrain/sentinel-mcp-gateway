@@ -1,0 +1,143 @@
+# Sentinel Gateway Configuration
+# Copy this file to sentinel.toml and uncomment the backends you need.
+# Secrets are referenced by env var name — never stored in this file.
+#
+# Quick start:
+#   cp sentinel.toml.example sentinel.toml
+#   # Edit sentinel.toml — uncomment your backends
+#   cargo build --release
+#   ./add-mcp.sh
+
+[gateway]
+# Address to listen on (use 127.0.0.1 for local, 0.0.0.0 inside Docker)
+listen = "127.0.0.1:9200"
+# Log level: trace, debug, info, warn, error
+log_level = "info"
+# Enable audit logging to Postgres (requires DATABASE_URL in .env)
+audit_enabled = true
+# Health/metrics endpoint (separate from main gateway)
+health_listen = "127.0.0.1:9201"
+
+[auth]
+# Env var containing the JWT secret (NOT the secret itself)
+jwt_secret_env = "JWT_SECRET_KEY"
+jwt_issuer = "sentinel-gateway"
+jwt_audience = "sentinel-api"
+
+[postgres]
+# Env var containing the Postgres connection URL
+url_env = "DATABASE_URL"
+max_connections = 10
+
+# ============================================================================
+# Backends
+#
+# Uncomment and configure the backends you need. All are optional.
+# Two types:
+#   "http"  — connects to an MCP server via URL (must be running separately)
+#   "stdio" — gateway spawns and manages the MCP server as a child process
+#
+# stdio backends use `npx -y` for portability (works on any machine with
+# Node.js installed). For faster startup, replace with absolute paths to
+# globally installed packages.
+# ============================================================================
+
+# --- HTTP Backends ---
+# These connect to MCP servers running as separate services.
+# Start them with: docker compose up -d
+
+# [[backends]]
+# name = "n8n"
+# type = "http"
+# url = "http://127.0.0.1:3001"
+# timeout_secs = 60
+# retries = 3
+
+# [[backends]]
+# name = "sqlite"
+# type = "http"
+# url = "http://127.0.0.1:3002"
+# timeout_secs = 60
+# retries = 3
+
+# --- stdio Backends ---
+# These are spawned and managed by the gateway as child processes.
+
+# Context7 — library documentation lookup
+# [[backends]]
+# name = "context7"
+# type = "stdio"
+# command = "npx"
+# args = ["-y", "@upstash/context7-mcp"]
+# restart_on_exit = true
+# max_restarts = 5
+
+# Firecrawl — web scraping (requires FIRECRAWL_API_KEY in .env)
+# [[backends]]
+# name = "firecrawl"
+# type = "stdio"
+# command = "npx"
+# args = ["-y", "firecrawl-mcp"]
+
+# Sequential Thinking — chain-of-thought reasoning
+# [[backends]]
+# name = "sequential-thinking"
+# type = "stdio"
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+
+# Playwright — browser automation
+# [[backends]]
+# name = "playwright"
+# type = "stdio"
+# command = "npx"
+# args = ["-y", "@playwright/mcp"]
+
+# Brave Search — web search (requires BRAVE_API_KEY in .env)
+# [[backends]]
+# name = "brave-search"
+# type = "stdio"
+# command = "npx"
+# args = ["-y", "@anthropic/brave-search-mcp"]
+
+# Filesystem — sandboxed file access
+# [[backends]]
+# name = "filesystem"
+# type = "stdio"
+# command = "npx"
+# args = ["-y", "@anthropic/filesystem-mcp", "/path/to/allowed/directory"]
+
+# ============================================================================
+# RBAC — Role-Based Access Control
+# Each role defines permissions and optionally denied tools.
+# ============================================================================
+
+[rbac.roles.admin]
+permissions = ["*"]
+
+[rbac.roles.developer]
+permissions = ["tools.read", "tools.execute"]
+denied_tools = []
+
+[rbac.roles.viewer]
+permissions = ["tools.read"]
+
+# ============================================================================
+# Rate Limits
+# default_rpm applies to all tools unless overridden per_tool.
+# ============================================================================
+
+[rate_limits]
+default_rpm = 1000
+
+[rate_limits.per_tool]
+# Limit expensive operations:
+# execute_workflow = 10
+
+# ============================================================================
+# Kill Switch — emergency disable for tools or backends without restart.
+# ============================================================================
+
+[kill_switch]
+disabled_tools = []
+disabled_backends = []

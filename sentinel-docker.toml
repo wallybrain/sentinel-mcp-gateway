@@ -1,0 +1,56 @@
+# Sentinel Gateway — Docker Configuration
+# This file is copied into the Docker image at build time.
+# Only HTTP backends are configured here — stdio processes cannot run
+# inside the minimal Docker container.
+#
+# To add stdio backends, run the gateway natively (not in Docker)
+# and use sentinel.toml instead.
+
+[gateway]
+listen = "0.0.0.0:9200"
+log_level = "info"
+audit_enabled = true
+health_listen = "0.0.0.0:9201"
+
+[auth]
+jwt_secret_env = "JWT_SECRET_KEY"
+jwt_issuer = "sentinel-gateway"
+jwt_audience = "sentinel-api"
+
+[postgres]
+url_env = "DATABASE_URL"
+max_connections = 10
+
+# HTTP backends — these connect to sidecar containers on the Docker network.
+# Container names resolve via Docker DNS.
+
+[[backends]]
+name = "n8n"
+type = "http"
+url = "http://mcp-n8n:3000"
+timeout_secs = 60
+retries = 3
+
+[[backends]]
+name = "sqlite"
+type = "http"
+url = "http://mcp-sqlite:3000"
+timeout_secs = 60
+retries = 3
+
+[rbac.roles.admin]
+permissions = ["*"]
+
+[rbac.roles.developer]
+permissions = ["tools.read", "tools.execute"]
+denied_tools = []
+
+[rbac.roles.viewer]
+permissions = ["tools.read"]
+
+[rate_limits]
+default_rpm = 1000
+
+[kill_switch]
+disabled_tools = []
+disabled_backends = []

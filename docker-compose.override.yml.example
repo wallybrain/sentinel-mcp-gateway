@@ -1,0 +1,22 @@
+# Docker Compose Override — Server-Specific Configuration
+# Copy to docker-compose.override.yml and customize for your server.
+# This file is gitignored — your overrides stay local.
+#
+# The base docker-compose.yml requires N8N_MCP_PATH and SQLITE_MCP_PATH
+# environment variables. Set them in .env or override build contexts here.
+
+services:
+  mcp-n8n:
+    build:
+      # Absolute path to your clone of the n8n MCP server repo
+      context: /path/to/n8n-mcp-server
+      dockerfile: sidecars/Dockerfile.n8n
+
+  mcp-sqlite:
+    build:
+      # Absolute path to your clone of the sqlite MCP server repo
+      context: /path/to/sqlite-mcp-server
+      dockerfile: sidecars/Dockerfile.mcp-sqlite
+    volumes:
+      # Map your database directory into the container
+      - /path/to/your/databases:/data

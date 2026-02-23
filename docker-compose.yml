@@ -41,8 +41,8 @@ services:
 
   mcp-n8n:
     build:
-      context: /home/lwb3/n8n-mcp-server
-      dockerfile: /home/lwb3/sentinel-gateway/sidecars/Dockerfile.n8n
+      context: ${N8N_MCP_PATH:?Set N8N_MCP_PATH in .env to your n8n-mcp-server directory}
+      dockerfile: sidecars/Dockerfile.n8n
     container_name: mcp-n8n
     restart: unless-stopped
     read_only: true
@@ -82,8 +82,8 @@ services:
 
   mcp-sqlite:
     build:
-      context: /home/lwb3/sqlite-mcp-server
-      dockerfile: /home/lwb3/sentinel-gateway/sidecars/Dockerfile.mcp-sqlite
+      context: ${SQLITE_MCP_PATH:?Set SQLITE_MCP_PATH in .env to your sqlite-mcp-server directory}
+      dockerfile: sidecars/Dockerfile.mcp-sqlite
     container_name: mcp-sqlite
     restart: unless-stopped
     read_only: true
@@ -99,7 +99,7 @@ services:
       - SQLITE_DB_DIR=/data
       - BACKEND_SHARED_SECRET=${BACKEND_SHARED_SECRET}
     volumes:
-      - /home/lwb3/databases:/data
+      - ${SQLITE_DB_DIR:-./data}:/data
     ports:
       - "127.0.0.1:3002:3000"
     healthcheck:
