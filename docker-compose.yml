@@ -57,6 +57,7 @@ services:
       - MCP_PORT=3000
       - N8N_URL=http://n8n:5678
       - N8N_API_KEY=${N8N_API_KEY}
+      - BACKEND_SHARED_SECRET=${BACKEND_SHARED_SECRET}
     ports:
       - "127.0.0.1:3001:3000"
     healthcheck:
@@ -96,6 +97,7 @@ services:
       - MCP_TRANSPORT=http
       - MCP_PORT=3000
       - SQLITE_DB_DIR=/data
+      - BACKEND_SHARED_SECRET=${BACKEND_SHARED_SECRET}
     volumes:
       - /home/lwb3/databases:/data
     ports:
