@@ -2,7 +2,7 @@
 name = "sentinel-gateway"
 version = "0.1.0"
 edition = "2024"
-license = "Proprietary"
+license = "BSL-1.1"
 
 [dependencies]
 tokio = { version = "1.47", features = ["full"] }
