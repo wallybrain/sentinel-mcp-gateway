@@ -27,6 +27,12 @@ docker-compose.override.yml
 # Logs
 *.log
 
+# Runtime config (user-specific paths)
+sentinel.toml
+
+# Internal project planning
+.planning/
+
 # Claude
 .claude/
 .claude/get-shit-done
