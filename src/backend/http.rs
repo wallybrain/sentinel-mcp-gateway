@@ -29,13 +29,14 @@ pub struct HttpBackend {
     url: String,
     timeout: Duration,
     max_retries: u32,
+    auth_secret: Option<String>,
 }
 
 impl HttpBackend {
     /// Create a new HttpBackend from a shared client and backend config.
     ///
     /// Appends `/mcp` to the URL if not already present.
-    pub fn new(client: Client, config: &BackendConfig) -> Self {
+    pub fn new(client: Client, config: &BackendConfig, auth_secret: Option<String>) -> Self {
         let base = config
             .url
             .as_deref()
@@ -53,6 +54,7 @@ impl HttpBackend {
             url,
             timeout: Duration::from_secs(config.timeout_secs),
             max_retries: config.retries,
+            auth_secret,
         }
     }
 
@@ -67,18 +69,26 @@ impl HttpBackend {
         let client = self.client.clone();
         let url = self.url.clone();
         let timeout = self.timeout;
+        let auth_secret = self.auth_secret.clone();
 
         retry_with_backoff(self.max_retries, move || {
             let client = client.clone();
             let url = url.clone();
             let body = body.clone();
+            let auth_secret = auth_secret.clone();
 
             async move {
-                let response = client
+                let mut req = client
                     .post(&url)
                     .header("Content-Type", "application/json")
                     .header("Accept", "application/json, text/event-stream")
-                    .timeout(timeout)
+                    .timeout(timeout);
+
+                if let Some(ref secret) = auth_secret {
+                    req = req.header("X-Sentinel-Auth", secret.as_str());
+                }
+
+                let response = req
                     .body(body)
                     .send()
                     .await
@@ -180,4 +190,50 @@ pub async fn discover_tools(backend: &HttpBackend) -> anyhow::Result<Vec<Tool>> 
     );
 
     Ok(tools)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::types::{BackendConfig, BackendType};
+    use std::collections::HashMap;
+
+    fn test_config() -> BackendConfig {
+        BackendConfig {
+            name: "test".to_string(),
+            backend_type: BackendType::Http,
+            url: Some("http://localhost:3000".to_string()),
+            command: None,
+            args: vec![],
+            env: HashMap::new(),
+            timeout_secs: 60,
+            retries: 3,
+            restart_on_exit: false,
+            max_restarts: 5,
+            health_interval_secs: 300,
+            circuit_breaker_threshold: 5,
+            circuit_breaker_recovery_secs: 30,
+        }
+    }
+
+    #[test]
+    fn new_stores_auth_secret() {
+        let client = build_http_client().unwrap();
+        let backend = HttpBackend::new(client, &test_config(), Some("my-secret".to_string()));
+        assert_eq!(backend.auth_secret.as_deref(), Some("my-secret"));
+    }
+
+    #[test]
+    fn new_without_auth_secret() {
+        let client = build_http_client().unwrap();
+        let backend = HttpBackend::new(client, &test_config(), None);
+        assert!(backend.auth_secret.is_none());
+    }
+
+    #[test]
+    fn url_appends_mcp_path() {
+        let client = build_http_client().unwrap();
+        let backend = HttpBackend::new(client, &test_config(), None);
+        assert_eq!(backend.url(), "http://localhost:3000/mcp");
+    }
 }

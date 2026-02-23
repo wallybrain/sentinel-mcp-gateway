@@ -59,7 +59,11 @@ async fn main() -> anyhow::Result<()> {
         match build_http_client() {
             Ok(client) => {
                 for backend_config in &http_backends {
-                    let backend = HttpBackend::new(client.clone(), backend_config);
+                    let backend = HttpBackend::new(
+                        client.clone(),
+                        backend_config,
+                        std::env::var("BACKEND_SHARED_SECRET").ok(),
+                    );
                     tracing::info!(
                         name = %backend_config.name,
                         url = %backend.url(),

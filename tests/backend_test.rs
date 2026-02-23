@@ -89,7 +89,7 @@ fn make_config(url: &str) -> BackendConfig {
 fn test_http_backend_appends_mcp_path() {
     let client = build_http_client().unwrap();
     let config = make_config("http://localhost:3000");
-    let backend = HttpBackend::new(client, &config);
+    let backend = HttpBackend::new(client, &config, None);
     assert_eq!(backend.url(), "http://localhost:3000/mcp");
 }
 
@@ -97,7 +97,7 @@ fn test_http_backend_appends_mcp_path() {
 fn test_http_backend_preserves_mcp_path() {
     let client = build_http_client().unwrap();
     let config = make_config("http://localhost:3000/mcp");
-    let backend = HttpBackend::new(client, &config);
+    let backend = HttpBackend::new(client, &config, None);
     assert_eq!(backend.url(), "http://localhost:3000/mcp");
 }
 
@@ -105,7 +105,7 @@ fn test_http_backend_preserves_mcp_path() {
 fn test_http_backend_strips_trailing_slash() {
     let client = build_http_client().unwrap();
     let config = make_config("http://localhost:3000/");
-    let backend = HttpBackend::new(client, &config);
+    let backend = HttpBackend::new(client, &config, None);
     assert_eq!(backend.url(), "http://localhost:3000/mcp");
 }
 
