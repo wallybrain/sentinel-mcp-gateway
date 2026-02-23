@@ -124,7 +124,6 @@ services:
 networks:
   sentinelnet:
     driver: bridge
-    internal: true
   n8nnet:
     external: true
     name: n8n-mcp_default
