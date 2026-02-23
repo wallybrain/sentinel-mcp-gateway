@@ -2,6 +2,8 @@
 
 > How to secure OpenClaw's MCP connections using Sentinel Gateway.
 
+> **Status**: Production-tested with Claude Code. OpenClaw integration uses the same standard MCP protocol and `mcpServers` configuration format. If you test it with OpenClaw, [open an issue](https://github.com/wallybrain/sentinel-mcp-gateway/issues) — we want to hear about your experience.
+
 OpenClaw is one of the most popular open-source AI agent frameworks, with over 180,000 GitHub stars. Its extensibility through MCP (Model Context Protocol) servers is a major strength, but that same extensibility introduces serious security risks when MCP connections are left unprotected. Sentinel Gateway sits between OpenClaw and its MCP backends, adding authentication, access control, rate limiting, audit logging, circuit breakers, and emergency kill switches.
 
 ---
@@ -104,7 +106,7 @@ Every tool call passes through Sentinel's security pipeline before reaching any 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for full deployment instructions.
 
 ```bash
-git clone https://github.com/wallybrain/sentinel-gateway.git
+git clone https://github.com/wallybrain/sentinel-mcp-gateway.git
 cd sentinel-gateway
 ./scripts/setup.sh
 cargo build --release

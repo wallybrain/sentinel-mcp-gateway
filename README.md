@@ -1,4 +1,4 @@
-# Sentinel Gateway
+# Sentinel MCP Gateway
 
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
@@ -52,7 +52,7 @@ All backends are optional and configurable. Use any combination of HTTP and stdi
 
 ```bash
 # 1. Clone
-git clone https://github.com/wallybrain/sentinel-gateway.git
+git clone https://github.com/wallybrain/sentinel-mcp-gateway.git
 cd sentinel-gateway
 
 # 2. Setup (generates .env and sentinel.toml)
@@ -113,7 +113,9 @@ max_restarts = 5
 
 ## Status
 
-**v1.0 shipped** — 47/47 requirements from the IBM/Anthropic whitepaper, 138 tests, 3,776 LOC Rust.
+**v1.0 shipped** — 47/47 requirements from the IBM/Anthropic whitepaper, 145 tests, 3,776 LOC Rust.
+
+Production-tested with Claude Code. OpenClaw integration uses the same standard MCP protocol and `mcpServers` configuration format. If you test it with OpenClaw, [open an issue](https://github.com/wallybrain/sentinel-mcp-gateway/issues) — we want to hear about your experience.
 
 ## License
 

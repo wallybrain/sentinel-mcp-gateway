@@ -39,7 +39,7 @@ sudo apt install -y python3
 
 ```bash
 # 1. Clone
-git clone https://github.com/wallybrain/sentinel-gateway.git
+git clone https://github.com/wallybrain/sentinel-mcp-gateway.git
 cd sentinel-gateway
 
 # 2. Setup (generates .env and sentinel.toml)
@@ -64,7 +64,7 @@ docker compose up -d postgres
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/wallybrain/sentinel-gateway.git
+git clone https://github.com/wallybrain/sentinel-mcp-gateway.git
 cd sentinel-gateway
 ```
 
