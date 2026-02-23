@@ -1,42 +1,33 @@
 # Sentinel Gateway
 
-A Rust-based enterprise MCP (Model Context Protocol) gateway, implementing the MCP Gateway pattern from the [IBM/Anthropic whitepaper](https://www.ibm.com/think/insights/architecting-secure-enterprise-ai-agents-mcp) (October 2025).
+[![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
 
-## Status
+A single-binary Rust MCP gateway that secures AI agent tool calls with centralized authentication, RBAC, rate limiting, and audit logging. Implements the [IBM/Anthropic MCP Gateway pattern](https://www.ibm.com/think/insights/architecting-secure-enterprise-ai-agents-mcp).
 
-**v1.0 shipped** — 47/47 requirements, 138 tests, 3,776 LOC Rust.
-**v1.1 in progress** — Deployed and running in production. Network hardening, monitoring, and ops phases remain.
+## Why
 
-## What It Does
+AI agents (Claude Code, OpenClaw, etc.) connect to MCP servers with no security layer — no auth, no access control, no audit trail. Any process on the same host can call any tool. Sentinel Gateway sits between agents and MCP servers, adding enterprise security controls without modifying either side.
 
-A single-binary Rust MCP gateway that:
-
-- Routes MCP tool calls from AI clients (Claude Code) to backend MCP servers
-- Provides centralized auth (JWT), RBAC, rate limiting, and audit trails
-- Manages both HTTP and stdio backends with health checks, circuit breakers, and auto-restart
-- Replaces a 5-container Python/PostgreSQL/Redis stack (IBM ContextForge) with one process
-- Speaks stdio (for Claude Code) with Streamable HTTP planned for future clients
-- Exposes Prometheus metrics and supports TOML hot-reload
+> **Using OpenClaw?** See our [security integration guide](docs/OPENCLAW.md) — Sentinel fills the critical MCP security gaps that led to [CVE-2026-25253](https://nvd.nist.gov/) and [1,800+ exposed instances](https://venturebeat.com/security/openclaw-agentic-ai-security-risk-ciso-guide).
 
 ## Architecture
 
 ```
-Claude Code (stdio)
+AI Agent (Claude Code, OpenClaw, etc.)
     |
     v
 Sentinel Gateway (single Rust binary, ~14 MB, <50 MB RAM)
-    |  auth, RBAC, rate limit, audit, circuit breakers
+    |  JWT auth, RBAC, rate limiting, audit, circuit breakers
     |
-    +---> mcp-n8n (HTTP, port 3001)
-    +---> mcp-sqlite (HTTP, port 3002)
-    +---> context7 (stdio, managed)
-    +---> firecrawl (stdio, managed)
-    +---> playwright (stdio, managed)
-    +---> sequential-thinking (stdio, managed)
-    +---> ollama (stdio, managed)
+    +---> MCP Server A (HTTP or stdio)
+    +---> MCP Server B
+    +---> MCP Server N
 ```
 
-### Sidecar Services (Docker Compose)
+All backends are optional and configurable. Use any combination of HTTP and stdio MCP servers — the gateway doesn't care what's behind it, only that it's secured.
+
+### Optional Sidecar Services (Docker Compose)
 
 | Service | Purpose | Port |
 |---------|---------|------|
@@ -46,47 +37,88 @@ Sentinel Gateway (single Rust binary, ~14 MB, <50 MB RAM)
 
 ## Features
 
-- **JWT Authentication** — Session-level token validation
-- **Rate Limiting** — Per-tool configurable limits with sliding window
-- **Circuit Breakers** — Automatic backend isolation on failure
-- **Audit Logging** — PostgreSQL-backed request/response audit trail
-- **Health Checks** — Periodic backend health with configurable intervals
-- **stdio Process Management** — Auto-restart with configurable max retries
-- **Prometheus Metrics** — Request counts, latencies, error rates, backend health
-- **TOML Hot Reload** — Update config without restarting the gateway
-- **Kill Switch** — Emergency disable for individual tools or entire backends
+- **JWT Authentication** — session-level token validation on every request
+- **RBAC** — role-based access control with per-tool deny lists
+- **Rate Limiting** — per-tool configurable limits with sliding window
+- **Audit Logging** — PostgreSQL-backed request/response trail
+- **Circuit Breakers** — automatic backend isolation on failure
+- **Health Checks** — periodic backend health with configurable intervals
+- **stdio Process Management** — auto-restart with configurable max retries
+- **Prometheus Metrics** — request counts, latencies, error rates, backend health
+- **TOML Hot Reload** — update config without restarting the gateway
+- **Kill Switch** — emergency disable for individual tools or entire backends
 
-## Build
+## Quick Start
 
 ```bash
+# 1. Clone
+git clone https://github.com/wallybrain/sentinel-gateway.git
+cd sentinel-gateway
+
+# 2. Setup (generates .env and sentinel.toml)
+./scripts/setup.sh
+
+# 3. Build
 cargo build --release
-# Binary: target/release/sentinel-gateway
+
+# 4. Start PostgreSQL (for audit logging)
+docker compose up -d postgres
+
+# 5. Register with Claude Code
+./add-mcp.sh
 ```
+
+See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for the full guide including JWT token generation, backend configuration, and security hardening.
 
 ## Configuration
 
-Runtime config lives in `sentinel.toml` (native) or `sentinel-docker.toml` (Docker).
-Secrets are referenced by environment variable name, never stored in config files.
+Runtime config lives in `sentinel.toml` (native) or `sentinel-docker.toml` (Docker). Copy the example and uncomment the backends you need:
+
+```bash
+cp sentinel.toml.example sentinel.toml
+# Edit sentinel.toml — uncomment your backends
+```
+
+Secrets are referenced by environment variable name, never stored in config files. See [.env.example](.env.example).
+
+### Example: Adding a Backend
+
+```toml
+# HTTP backend (running separately)
+[[backends]]
+name = "my-service"
+type = "http"
+url = "http://127.0.0.1:3003"
+timeout_secs = 30
+
+# stdio backend (managed by gateway)
+[[backends]]
+name = "context7"
+type = "stdio"
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+restart_on_exit = true
+max_restarts = 5
+```
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [Current Infrastructure](docs/CURRENT-INFRASTRUCTURE.md) | VPS and container map |
-| [Rust Wrapper Analysis](docs/RUST-WRAPPER-ANALYSIS.md) | Technical deep-dive on the original stdio bridge |
-| [ContextForge Gateway](docs/CONTEXTFORGE-GATEWAY.md) | IBM ContextForge deployment details |
-| [MCP Topology](docs/MCP-TOPOLOGY.md) | How Claude Code connects to all MCP servers |
-| [Whitepaper Requirements](docs/WHITEPAPER-REQUIREMENTS.md) | Gateway requirements from IBM/Anthropic PDF |
+| [Deployment Guide](docs/DEPLOYMENT.md) | Step-by-step setup on a naked VPS |
+| [OpenClaw Integration](docs/OPENCLAW.md) | Securing OpenClaw with Sentinel |
+| [MCP Topology](docs/MCP-TOPOLOGY.md) | Connection flow and protocol details |
+| [Whitepaper Requirements](docs/WHITEPAPER-REQUIREMENTS.md) | IBM/Anthropic gateway spec coverage |
+| [Rust Wrapper Analysis](docs/RUST-WRAPPER-ANALYSIS.md) | Technical deep-dive on the stdio bridge |
 
-## Motivation
+## Status
 
-1. **Learning & ownership** — Deep Rust systems programming; own every line
-2. **Performance & footprint** — Single binary, minimal resources, production-grade
-3. **Product opportunity** — No production Rust MCP gateway exists in the ecosystem
-4. **Enterprise alignment** — Implements the IBM/Anthropic whitepaper pattern natively
+**v1.0 shipped** — 47/47 requirements from the IBM/Anthropic whitepaper, 138 tests, 3,776 LOC Rust.
 
 ## License
 
-Copyright (c) 2026 Wally Blanchard. All rights reserved.
+[Business Source License 1.1](LICENSE) — you can use, modify, and deploy Sentinel Gateway freely. The only restriction: you cannot offer it as a managed/hosted MCP gateway service to third parties.
 
-This source code and documentation are proprietary. No part of this repository may be reproduced, distributed, or transmitted in any form without prior written permission.
+Converts to [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) on **2030-02-23**.
+
+For alternative licensing, contact the author.
