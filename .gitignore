@@ -32,6 +32,7 @@ sentinel.toml
 
 # Internal project planning
 .planning/
+docs/plans/
 
 # Claude
 .claude/

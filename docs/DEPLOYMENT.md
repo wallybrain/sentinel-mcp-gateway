@@ -315,30 +315,3 @@ LIMIT 20;
 | `SQLX_OFFLINE=true` error | Missing offline query data | Set `SQLX_OFFLINE=true` env var during build |
 | `add-mcp.sh: .env not found` | Haven't run setup | Run `./scripts/setup.sh` first |
 | `add-mcp.sh: Binary not found` | Haven't built | Run `cargo build --release` first |
-
----
-
-## Going Public Checklist
-
-Steps to run before making this repository public:
-
-1. **Strip planning files from history:**
-   ```bash
-   pip install git-filter-repo
-   git filter-repo --path .planning/ --invert-paths
-   ```
-
-2. **Strip internal project notes from history:**
-   ```bash
-   git filter-repo --path CLAUDE.md --invert-paths
-   ```
-
-3. **Audit remaining history** for any server-specific references you want cleaned.
-
-4. **Flip GitHub visibility** to public in repository settings.
-
-5. **Add GitHub Actions CI** (cargo test, cargo clippy, cargo fmt --check).
-
-6. **Add shields.io badges** to README (build status, license, crates.io version).
-
-7. **Create a GitHub release** with the compiled binary attached.
