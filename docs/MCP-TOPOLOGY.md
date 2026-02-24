@@ -1,6 +1,6 @@
 # MCP Topology
 
-How Claude Code connects to MCP servers through Sentinel Gateway.
+How AI agents connect to MCP servers through Sentinel Gateway.
 
 ## Connection Overview
 
@@ -9,9 +9,15 @@ All MCP traffic flows through a single governed chokepoint — Sentinel Gateway.
 ### Governed (via Sentinel Gateway)
 
 ```
-Claude Code
+Claude Code (local, stdio)
     |
     | stdio (JSON-RPC over stdin/stdout)
+    |
+    v
+OpenClaw (remote, SSH tunnel)
+    |
+    | mcporter → SSH → run-sentinel.sh → stdio
+    | (WireGuard encrypted, cross-architecture)
     |
     v
 Sentinel Gateway (native Rust binary, ~14 MB)
@@ -33,11 +39,19 @@ Sentinel Gateway (native Rust binary, ~14 MB)
           +---> ollama (local LLM, disabled)
 ```
 
-**Auth flow:**
+**Auth flow (local — Claude Code):**
 1. Claude Code spawns Sentinel binary as stdio subprocess
 2. Sentinel reads JWT from `SENTINEL_TOKEN` env var, validates at startup
 3. All tool calls are authenticated, rate-limited, and audit-logged
 4. HTTP backends reached via reqwest; stdio backends managed as child processes
+
+**Auth flow (remote — OpenClaw via SSH tunnel):**
+1. OpenClaw agent invokes mcporter skill: `mcporter call sentinel.<tool>`
+2. mcporter SSHs to the backend host, runs `run-sentinel.sh`
+3. `run-sentinel.sh` sources `.env`, exports secrets, execs sentinel binary
+4. Sentinel performs JWT auth, RBAC, rate limiting, audit logging
+5. Tool call routed to backend, response flows back through SSH tunnel
+6. Secrets never leave the backend host — only JSON-RPC messages traverse the tunnel
 5. Circuit breakers isolate failing backends automatically
 
 ### Previously Ungoverned (now governed)

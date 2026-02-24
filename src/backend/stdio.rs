@@ -31,9 +31,20 @@ impl StdioBackend {
 
         let mut cmd = Command::new(command);
         cmd.args(&config.args);
+
+        // Clear inherited environment to prevent secret leakage (e.g. JWT_SECRET_KEY,
+        // DATABASE_URL) to child processes. Only pass through safe system vars and
+        // any explicit per-backend env entries from sentinel.toml.
+        cmd.env_clear();
+        for key in &["PATH", "HOME", "USER", "LANG", "NODE_PATH", "NVM_DIR", "NVM_BIN", "TMPDIR", "TERM"] {
+            if let Ok(val) = std::env::var(key) {
+                cmd.env(key, val);
+            }
+        }
         for (k, v) in &config.env {
             cmd.env(k, v);
         }
+
         cmd.stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())

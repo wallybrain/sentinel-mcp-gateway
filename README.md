@@ -9,7 +9,7 @@ A single-binary Rust MCP gateway that secures AI agent tool calls with centraliz
 
 AI agents (Claude Code, OpenClaw, etc.) connect to MCP servers with no security layer — no auth, no access control, no audit trail. Any process on the same host can call any tool. Sentinel Gateway sits between agents and MCP servers, adding enterprise security controls without modifying either side.
 
-> **Using OpenClaw?** See our [security integration guide](docs/OPENCLAW.md) — Sentinel fills the critical MCP security gaps that led to [CVE-2026-25253](https://nvd.nist.gov/) and [1,800+ exposed instances](https://venturebeat.com/security/openclaw-agentic-ai-security-risk-ciso-guide).
+> **Using OpenClaw?** See our [tested integration guide](docs/OPENCLAW.md) — production-verified SSH stdio tunnel pattern that secures OpenClaw's MCP connections with JWT auth, RBAC, rate limiting, and audit logging. Addresses the critical security gaps behind [CVE-2026-25253](https://nvd.nist.gov/) and [1,800+ exposed instances](https://venturebeat.com/security/openclaw-agentic-ai-security-risk-ciso-guide).
 
 ## Architecture
 
@@ -115,7 +115,7 @@ max_restarts = 5
 
 **v1.0 shipped** — 47/47 requirements from the IBM/Anthropic whitepaper, 145 tests, 3,776 LOC Rust.
 
-Production-tested with Claude Code. OpenClaw integration uses the same standard MCP protocol and `mcpServers` configuration format. If you test it with OpenClaw, [open an issue](https://github.com/wallybrain/sentinel-mcp-gateway/issues) — we want to hear about your experience.
+Production-tested with Claude Code (local stdio) and OpenClaw (remote SSH stdio tunnel via mcporter). See [docs/OPENCLAW.md](docs/OPENCLAW.md) for the full integration guide with cross-architecture deployment (x86_64 backend + ARM64 OpenClaw host).
 
 ## License
 

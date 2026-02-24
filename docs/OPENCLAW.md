@@ -2,33 +2,28 @@
 
 > How to secure OpenClaw's MCP connections using Sentinel Gateway.
 
-> **Status**: Production-tested with Claude Code. OpenClaw integration uses the same standard MCP protocol and `mcpServers` configuration format. If you test it with OpenClaw, [open an issue](https://github.com/wallybrain/sentinel-mcp-gateway/issues) — we want to hear about your experience.
-
-OpenClaw is one of the most popular open-source AI agent frameworks, with over 180,000 GitHub stars. Its extensibility through MCP (Model Context Protocol) servers is a major strength, but that same extensibility introduces serious security risks when MCP connections are left unprotected. Sentinel Gateway sits between OpenClaw and its MCP backends, adding authentication, access control, rate limiting, audit logging, circuit breakers, and emergency kill switches.
+> **Status**: Production-tested. This guide documents a working deployment where an OpenClaw agent on a remote ARM64 server accesses 50 MCP tools on an x86_64 host through Sentinel Gateway via an SSH stdio tunnel over WireGuard. All tool calls are JWT-authenticated, rate-limited, and audit-logged.
 
 ---
 
 ## The Problem: OpenClaw's MCP Security Gap
 
-OpenClaw connects directly to MCP servers with minimal security controls. Several high-profile vulnerabilities and research findings have made this a pressing concern:
+OpenClaw connects to MCP backends with minimal security controls. Several high-profile vulnerabilities have made this a pressing concern:
 
-- **CVE-2026-25253** (CVSS 8.8): One-click remote code execution via stolen authentication tokens through the Control UI. An attacker who gains access to the web interface can execute arbitrary commands on the host through any connected MCP server.
-
-- **1,800+ exposed instances** discovered leaking API keys, chat histories, and credentials to the public internet (VentureBeat, Feb 2026). Many deployments run OpenClaw with default settings and no network isolation.
-
-- **92% exploitation probability** with just 10 MCP plugins deployed, according to Pynt security research. Each additional MCP server exponentially increases the attack surface because there is no authentication or authorization between OpenClaw and its backends.
-
-- **Microsoft advisory** (Feb 2026): OpenClaw should be treated as untrusted code execution and is not appropriate for standard workstations without additional security controls.
+- **CVE-2026-25253** (CVSS 8.8): One-click remote code execution via stolen authentication tokens through the Control UI.
+- **1,800+ exposed instances** discovered leaking API keys, chat histories, and credentials to the public internet (VentureBeat, Feb 2026).
+- **92% exploitation probability** with just 10 MCP plugins deployed (Pynt security research).
+- **Microsoft advisory** (Feb 2026): OpenClaw should be treated as untrusted code execution.
 
 The core gaps in OpenClaw's MCP layer:
 
 | Gap | Risk |
 |-----|------|
-| **No MCP-layer auth** | Any process on the same host can call MCP servers directly, bypassing OpenClaw entirely |
-| **No access control** | All connected agents have full access to all tools on all backends |
+| **No MCP-layer auth** | Any process on the same host can call MCP servers directly |
+| **No access control** | All agents have full access to all tools on all backends |
 | **No audit trail** | No record of which tools were called, by whom, or what data was accessed |
 | **No rate limiting** | Runaway or compromised agents can make unlimited tool calls |
-| **No circuit breakers** | One failing or slow backend can cascade failures across all agents |
+| **No circuit breakers** | One failing backend can cascade failures across all agents |
 | **No emergency controls** | Disabling a compromised tool requires restarting the entire system |
 
 ---
@@ -39,57 +34,69 @@ Sentinel Gateway is a single Rust binary (~14 MB) that implements the MCP Gatewa
 
 | OpenClaw Gap | Sentinel Feature |
 |---|---|
-| No MCP auth | JWT authentication -- every request is validated before reaching any backend |
-| No access control | RBAC -- restrict which tools each role can call, with deny lists for dangerous operations |
-| No rate limiting | Per-tool configurable rate limits with sliding window (requests per minute) |
-| No audit trail | PostgreSQL-backed request/response audit logging with full tool call details |
-| No failure isolation | Circuit breakers -- automatic backend isolation when error thresholds are exceeded |
-| No emergency controls | Kill switch -- disable individual tools or entire backends without restart |
-| No observability | Prometheus metrics endpoint -- request counts, latencies, error rates per tool and backend |
+| No MCP auth | JWT authentication — every request validated before reaching any backend |
+| No access control | RBAC — restrict which tools each role can call, with deny lists |
+| No rate limiting | Per-tool configurable rate limits with sliding window |
+| No audit trail | PostgreSQL-backed request/response audit logging |
+| No failure isolation | Circuit breakers — automatic backend isolation on failure |
+| No emergency controls | Kill switch — disable individual tools or entire backends without restart |
+| No observability | Prometheus metrics — request counts, latencies, error rates |
 
 ---
 
 ## Architecture
 
-### Without Sentinel Gateway
+### The SSH Stdio Tunnel Pattern
+
+The recommended integration uses OpenClaw's **mcporter** skill to connect to Sentinel Gateway over an SSH stdio tunnel. This pattern keeps all backends and secrets on a single secured host while giving remote OpenClaw agents full tool access.
 
 ```
-OpenClaw Agent A --> MCP Server: filesystem    (unprotected)
-OpenClaw Agent A --> MCP Server: brave-search  (unprotected)
-OpenClaw Agent B --> MCP Server: github        (unprotected)
-OpenClaw Agent B --> MCP Server: web-scraper   (unprotected)
-
-  - No authentication between agents and servers
-  - No visibility into what tools are being called
-  - No way to restrict access per agent
-  - No way to disable a tool without killing the process
+┌─────────────────────────────────────────────────────────────────────┐
+│  REMOTE HOST (OpenClaw)                                             │
+│                                                                     │
+│  OpenClaw Agent                                                     │
+│      │                                                              │
+│      │ mcporter skill: "mcporter call sentinel.<tool> ..."          │
+│      │                                                              │
+│      v                                                              │
+│  mcporter CLI ──── SSH stdio ──── WireGuard / LAN ────────────┐     │
+│                                                                │     │
+└────────────────────────────────────────────────────────────────│─────┘
+                                                                 │
+┌────────────────────────────────────────────────────────────────│─────┐
+│  BACKEND HOST (Sentinel + backends)                            │     │
+│                                                                v     │
+│  run-sentinel.sh                                                     │
+│      │  sources .env (secrets never leave this host)                 │
+│      │  constructs DATABASE_URL                                      │
+│      v                                                              │
+│  Sentinel Gateway (Rust binary)                                      │
+│      │  JWT auth, RBAC, rate limiting, audit logging                │
+│      │                                                              │
+│      ├──→ HTTP Backends                                             │
+│      │     ├── mcp-n8n (127.0.0.1:3001)                            │
+│      │     └── mcp-sqlite (127.0.0.1:3002)                         │
+│      │                                                              │
+│      ├──→ Stdio Backends (child processes)                          │
+│      │     ├── context7 (library documentation)                     │
+│      │     ├── firecrawl (web scraping)                             │
+│      │     ├── playwright (browser automation)                      │
+│      │     └── sequential-thinking (chain-of-thought)               │
+│      │                                                              │
+│      └──→ PostgreSQL (127.0.0.1:5432, audit logs)                   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-### With Sentinel Gateway
+### Why This Pattern Works
 
-```
-OpenClaw Agent A --+
-                   +---> Sentinel Gateway ---> MCP Server: filesystem
-OpenClaw Agent B --+          |            ---> MCP Server: brave-search
-                              |            ---> MCP Server: github
-                              |            ---> MCP Server: web-scraper
-                              |
-                        +-----------+
-                        | JWT Auth  |
-                        | RBAC      |
-                        | Rate Limit|
-                        | Audit Log |
-                        | Circuit   |
-                        | Breakers  |
-                        | Kill Sw.  |
-                        | Metrics   |
-                        +-----------+
-                              |
-                        PostgreSQL
-                        (audit log)
-```
+**Secrets never leave the backend host.** The `.env` file containing JWT secrets, API keys, and database credentials is sourced by `run-sentinel.sh` on the backend host. The SSH tunnel carries only MCP JSON-RPC messages — no credentials traverse the network.
 
-Every tool call passes through Sentinel's security pipeline before reaching any backend. Agents authenticate once via JWT, and all subsequent requests are authorized, rate-limited, logged, and monitored.
+**Single trust boundary.** All tool calls from all remote OpenClaw agents funnel through one Sentinel instance. One config, one audit log, one place to apply rate limits and kill switches.
+
+**Cross-architecture compatible.** Sentinel runs on the host where it was compiled. The remote OpenClaw host doesn't need Rust, the sentinel binary, or any MCP backend packages — it only needs SSH and mcporter.
+
+**Network-layer encryption.** SSH encrypts the stdio tunnel. When combined with WireGuard (recommended), you get double encryption with mutual authentication at the network level.
 
 ---
 
@@ -97,179 +104,260 @@ Every tool call passes through Sentinel's security pipeline before reaching any 
 
 ### Prerequisites
 
-- Sentinel Gateway binary (built from source with `cargo build --release`)
-- PostgreSQL instance for audit logging (Docker Compose included)
-- OpenClaw installation with MCP servers you want to protect
+**Backend host** (where Sentinel and backends run):
+- Sentinel Gateway binary (`cargo build --release`)
+- PostgreSQL for audit logging (`docker compose up -d postgres`)
+- MCP backend packages (Node.js for stdio backends)
+- SSH server
 
-### Step 1: Deploy Sentinel Gateway
+**Remote OpenClaw host:**
+- OpenClaw (v2026.2+ recommended)
+- Node.js 22+ (for OpenClaw and mcporter)
+- mcporter (`npm install -g mcporter`)
+- SSH client with key-based auth to the backend host
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for full deployment instructions.
+### Step 1: Deploy Sentinel Gateway on the Backend Host
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for the full guide. Quick version:
 
 ```bash
 git clone https://github.com/wallybrain/sentinel-mcp-gateway.git
 cd sentinel-gateway
-./scripts/setup.sh
-cargo build --release
+./scripts/setup.sh          # generates .env and sentinel.toml
+cargo build --release       # builds target/release/sentinel-gateway
 docker compose up -d postgres
 ```
 
-### Step 2: Configure Your MCP Backends
+### Step 2: Create the Launch Wrapper
 
-Each MCP server that OpenClaw currently connects to directly becomes a backend entry in `sentinel.toml`:
+Create `run-sentinel.sh` in the sentinel-gateway directory. This script sources secrets and launches the binary — it's what SSH will execute remotely.
 
-```toml
-# Example: common OpenClaw MCP servers
+```bash
+#!/bin/bash
+# Launch sentinel-gateway with env vars from .env
+# Used by remote mcporter over SSH tunnel.
+set -euo pipefail
 
-[[backends]]
-name = "filesystem"
-type = "stdio"
-command = "npx"
-args = ["-y", "@modelcontextprotocol/server-filesystem", "/allowed/path"]
-restart_on_exit = true
-max_restarts = 5
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
 
-[[backends]]
-name = "brave-search"
-type = "stdio"
-command = "npx"
-args = ["-y", "@anthropic/mcp-server-brave-search"]
+# Export all vars from .env (dotenv format, no 'export' prefix)
+set -a
+source .env
+set +a
 
-[[backends]]
-name = "github"
-type = "stdio"
-command = "npx"
-args = ["-y", "@modelcontextprotocol/server-github"]
+# Construct DATABASE_URL from POSTGRES_PASSWORD
+export DATABASE_URL="postgres://sentinel:${POSTGRES_PASSWORD}@127.0.0.1:5432/sentinel"
 
-[[backends]]
-name = "web-scraper"
-type = "stdio"
-command = "npx"
-args = ["-y", "@anthropic/mcp-server-fetch"]
+exec ./target/release/sentinel-gateway --config sentinel.toml
 ```
 
-Environment variables (API keys, tokens) are inherited from the gateway's environment. Set them in `.env`.
-
-### Step 3: Point OpenClaw at Sentinel
-
-Replace OpenClaw's direct MCP server connections with a single Sentinel Gateway entry.
-
-**Before** (direct, unprotected connections):
-
-```json
-{
-  "mcpServers": {
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/allowed/path"]
-    },
-    "brave-search": {
-      "command": "npx",
-      "args": ["-y", "@anthropic/mcp-server-brave-search"],
-      "env": { "BRAVE_API_KEY": "your-brave-key" }
-    },
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "your-token" }
-    }
-  }
-}
+```bash
+chmod +x run-sentinel.sh
 ```
 
-**After** (all traffic routed through Sentinel):
+### Step 3: Set Up SSH Key Authentication
 
-```json
-{
-  "mcpServers": {
-    "sentinel-gateway": {
-      "command": "/path/to/sentinel-gateway",
-      "args": ["--config", "/path/to/sentinel.toml"],
-      "env": {
-        "JWT_SECRET_KEY": "your-jwt-secret",
-        "SENTINEL_TOKEN": "your-sentinel-token",
-        "DATABASE_URL": "postgres://sentinel:password@127.0.0.1:5432/sentinel",
-        "BRAVE_API_KEY": "your-brave-key",
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "your-token"
-      }
-    }
-  }
-}
+On the **remote OpenClaw host**, generate an SSH key and authorize it on the backend host:
+
+```bash
+# On the OpenClaw host:
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "" -C "openclaw-agent"
+
+# Copy the public key to the backend host:
+ssh-copy-id -i ~/.ssh/id_ed25519.pub user@backend-host
+
+# Verify passwordless SSH works:
+ssh user@backend-host "echo SSH_OK"
 ```
 
-Sentinel federates tool catalogs from all backends and presents them as a unified set. OpenClaw sees the same tools it would see with direct connections.
+If using WireGuard or a VPN, use the tunnel IP address (e.g., `10.0.0.1`) rather than the public IP.
 
-### Step 4: Configure RBAC for OpenClaw Agents
+### Step 4: Install and Configure mcporter
 
-Assign roles via JWT claims. The `role` claim must match a role in `sentinel.toml`:
+On the **remote OpenClaw host**:
 
-```json
-{
-  "sub": "openclaw-agent-research",
-  "role": "viewer",
-  "iss": "sentinel-gateway",
-  "aud": "sentinel-api"
-}
+```bash
+# Install mcporter globally
+npm install -g mcporter
+
+# Register Sentinel as a stdio server over SSH
+mcporter config add sentinel \
+  --command ssh \
+  --arg "-o" --arg "ConnectTimeout=5" \
+  --arg "user@backend-host" \
+  --arg "/path/to/sentinel-gateway/run-sentinel.sh" \
+  --description "Sentinel MCP Gateway (SSH tunnel)" \
+  --scope home
 ```
+
+Verify the connection:
+
+```bash
+# List all tools available through Sentinel
+mcporter list sentinel
+
+# Test a tool call
+mcporter call sentinel.echo message="Hello from OpenClaw"
+```
+
+You should see all federated tools from every backend configured in `sentinel.toml`.
+
+### Step 5: Enable the mcporter Skill in OpenClaw
+
+```bash
+openclaw config set skills.entries.mcporter.enabled true
+systemctl --user restart openclaw-gateway
+```
+
+The OpenClaw agent can now use mcporter as a skill to call any Sentinel-protected tool:
+
+```
+mcporter call sentinel.firecrawl_scrape url=https://example.com
+mcporter call sentinel.resolve-library-id libraryName=react query="hooks"
+mcporter call sentinel.browser_navigate url=https://example.com
+mcporter list sentinel --schema
+```
+
+### Step 6: Verify End-to-End
+
+Run an agent turn that exercises the full pipeline:
+
+```bash
+openclaw agent --local --agent main \
+  -m "Use mcporter to call sentinel.echo with message='integration test'" \
+  --timeout 60
+```
+
+The agent should invoke the mcporter skill, SSH into the backend host, run sentinel, execute the echo tool, and return the result — all authenticated and audit-logged.
 
 ---
 
-## Recommended Security Policies
+## What This Enables
 
-### 1. Research Assistant
+The Sentinel + OpenClaw integration unlocks capabilities that neither system provides alone:
 
-Read-only tools. Can search the web and look up documentation but cannot modify files or interact with external services.
+### Governed Autonomous Agents
+
+OpenClaw agents can operate autonomously (responding to Discord messages, running on heartbeat schedules, executing cron jobs) while every tool call passes through Sentinel's security pipeline. If an agent receives a prompt injection via a chat message, Sentinel's rate limiting and RBAC prevent it from causing damage beyond its permitted scope.
+
+### Multi-Agent Access Control
+
+Different OpenClaw agents can receive different JWT tokens with different roles. A research agent gets read-only access; a development agent gets write access but no destructive operations; an admin agent gets full access with aggressive rate limits.
 
 ```toml
+# Research agent: read-only, rate-limited
 [rbac.roles.research]
 permissions = ["tools.read", "tools.execute"]
-denied_tools = [
-  "filesystem__write_file",
-  "filesystem__delete_file",
-  "filesystem__move_file",
-  "filesystem__create_directory",
-  "github__create_issue",
-  "github__create_pull_request",
-  "github__push_files",
-]
+denied_tools = ["filesystem__write_file", "filesystem__delete_file"]
 
-[rate_limits.per_tool]
-brave_search = 30
-web_scraper__fetch = 20
-```
-
-### 2. Development Agent
-
-Code tools allowed, no destructive filesystem operations. Rate-limited on expensive operations.
-
-```toml
+# Development agent: write access, no destructive ops
 [rbac.roles.development]
 permissions = ["tools.read", "tools.execute"]
 denied_tools = ["filesystem__delete_file"]
-
-[rate_limits.per_tool]
-github__push_files = 10
-github__create_pull_request = 5
-filesystem__write_file = 60
 ```
 
-### 3. Full Autonomy
+### Cross-Platform Tool Federation
 
-All tools available with rate limits and full audit logging. Use only for trusted, well-tested workflows.
+A single Sentinel instance can serve tools to multiple AI agent platforms simultaneously. Claude Code connects via stdio (local), OpenClaw connects via SSH tunnel (remote), and any future MCP-compatible agent can connect the same way. All share the same backends, the same audit log, the same rate limits.
+
+### Auditable AI Operations
+
+Every tool call from every agent is logged to PostgreSQL with timestamp, agent identity (from JWT `sub` claim), tool name, backend, request parameters, response status, and latency. This provides a complete, queryable audit trail for compliance, debugging, and incident response.
+
+```sql
+-- What did the OpenClaw agent do in the last hour?
+SELECT timestamp, tool_name, status, latency_ms
+FROM audit_log
+WHERE client_subject = 'openclaw-main'
+  AND timestamp > NOW() - INTERVAL '1 hour'
+ORDER BY timestamp DESC;
+```
+
+### Emergency Response
+
+If an agent is behaving unexpectedly, you can instantly disable specific tools or entire backends without restarting anything:
 
 ```toml
-[rbac.roles.autonomous]
-permissions = ["tools.read", "tools.execute"]
-denied_tools = []
+# Kill switch: disable a specific tool
+[kill_switch]
+disabled_tools = ["filesystem__delete_file"]
 
-[rate_limits]
-default_rpm = 500
-
-[rate_limits.per_tool]
-filesystem__delete_file = 5
-github__push_files = 10
+# Or disable an entire backend
+disabled_backends = ["firecrawl"]
 ```
 
-Even in full autonomy mode, Sentinel provides complete audit trail, rate limiting, circuit breakers, and kill switch.
+Sentinel supports TOML hot reload — changes take effect without restarting the gateway or dropping active connections.
+
+---
+
+## Performance
+
+Measured with OpenClaw v2026.2.22 connecting to Sentinel over WireGuard (LAN latency ~1ms):
+
+| Metric | Value |
+|--------|-------|
+| SSH connection setup | ~100-200ms (one-time per mcporter call) |
+| Sentinel cold start + backend discovery | ~2-3s |
+| Sentinel security pipeline (auth + RBAC + audit) | < 1ms per request |
+| End-to-end tool call (echo) | ~5-6s |
+| End-to-end with web scrape (firecrawl) | ~8-10s |
+| Full agent turn including LLM reasoning | ~18-20s |
+
+The LLM thinking time (10-12s) dominates every agent turn. The tunnel overhead is a small fraction of total latency. For most use cases, the security benefits far outweigh the few seconds of additional latency.
+
+### Optimization: SSH Connection Multiplexing
+
+To eliminate repeated SSH handshake overhead, enable SSH connection multiplexing on the OpenClaw host:
+
+```
+# ~/.ssh/config
+Host backend-host
+    HostName 10.0.0.1
+    User your-user
+    ControlMaster auto
+    ControlPath ~/.ssh/sockets/%r@%h-%p
+    ControlPersist 600
+```
+
+```bash
+mkdir -p ~/.ssh/sockets
+```
+
+This keeps the SSH connection alive for 10 minutes between mcporter calls, reducing subsequent connection setup to near-zero.
+
+---
+
+## Important: OpenClaw Config Pitfalls
+
+**Do NOT add `mcpServers` to `openclaw.json`.** OpenClaw has strict config validation — unknown keys cause the gateway to crash-loop. MCP servers are managed through mcporter, not through `openclaw.json`.
+
+```json
+// WRONG — causes crash loop
+{
+  "gateway": {
+    "mcpServers": { ... }
+  }
+}
+
+// CORRECT — mcporter manages MCP servers separately
+// ~/.mcporter/mcporter.json
+{
+  "mcpServers": {
+    "sentinel": {
+      "command": "ssh",
+      "args": ["user@host", "/path/to/run-sentinel.sh"]
+    }
+  }
+}
+```
+
+If the gateway is crash-looping due to a bad config key, restore the backup:
+
+```bash
+cp ~/.openclaw/openclaw.json.bak ~/.openclaw/openclaw.json
+systemctl --user restart openclaw-gateway
+```
 
 ---
 
@@ -288,10 +376,10 @@ Even in full autonomy mode, Sentinel provides complete audit trail, rate limitin
 | Kill switch | Yes | No | No | No |
 | Prometheus metrics | Yes | No | Yes | No |
 | Single binary | Yes (~14 MB Rust) | No | No | N/A |
-| Latency overhead | < 1 ms (stdio) | Network hop | Network hop | None |
+| Cross-architecture | Yes (SSH tunnel) | No | No | N/A |
 | Offline capable | Yes | No | No | Yes |
 
-**Why self-hosted matters for OpenClaw users:** OpenClaw deployments often handle sensitive data -- API keys, source code, internal documents. Routing MCP traffic through a third-party SaaS gateway defeats the purpose of running agents locally. Sentinel runs on your infrastructure with zero external dependencies.
+**Why self-hosted matters for OpenClaw users:** OpenClaw deployments often handle sensitive data — API keys, source code, internal documents. Routing MCP traffic through a third-party SaaS gateway defeats the purpose of running agents locally. Sentinel runs on your infrastructure with zero external dependencies.
 
 ---
 
@@ -300,14 +388,23 @@ Even in full autonomy mode, Sentinel provides complete audit trail, rate limitin
 **Does Sentinel change the tools available to OpenClaw?**
 No. Sentinel federates tool catalogs from all configured backends and presents them as a unified set, minus any tools blocked by RBAC or the kill switch.
 
+**Can multiple OpenClaw agents share one Sentinel instance?**
+Yes. Each agent can use a different JWT token with different role claims. Sentinel applies per-role RBAC and logs each agent's activity separately.
+
+**What happens if the SSH tunnel drops?**
+mcporter starts a fresh connection on the next tool call. There is no persistent state in the tunnel — each invocation is independent. Enable SSH `ControlMaster` multiplexing to reduce reconnection overhead.
+
 **What happens if a backend goes down?**
 The circuit breaker detects repeated failures and temporarily isolates the backend. Other backends continue normally. When the failed backend recovers, it's automatically re-enabled.
 
-**What is the performance overhead?**
-Sub-millisecond per request for stdio backends (JWT validation, RBAC check, audit log write). Negligible compared to actual MCP tool call latency.
+**Do I need Rust on the OpenClaw host?**
+No. The sentinel binary runs on the backend host. The OpenClaw host only needs SSH and mcporter (Node.js).
+
+**Can I restrict which tools OpenClaw can access?**
+Yes. Use RBAC `denied_tools` in `sentinel.toml` to block specific tools per role, or use the kill switch to disable tools globally. You can also configure different JWT tokens for different agents.
 
 **Where are audit logs stored?**
-PostgreSQL, specified by `DATABASE_URL`. Each record includes: timestamp, agent identity (from JWT), tool name, backend, request parameters, response status, and latency.
+PostgreSQL on the backend host. Each record includes: timestamp, agent identity (from JWT), tool name, backend, request parameters, response status, and latency.
 
 ---
 
